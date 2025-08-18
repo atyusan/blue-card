@@ -1,0 +1,735 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"  // Commented out to use standard location
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  username    String       @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  auditLogs   AuditLog[]
+  staffMember StaffMember?
+
+  @@map("users")
+}
+
+model StaffMember {
+  id                        String            @id @default(cuid())
+  userId                    String            @unique
+  employeeId                String            @unique
+  department                String
+  specialization            String?
+  licenseNumber             String?
+  hireDate                  DateTime
+  isActive                  Boolean           @default(true)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  admissions                Admission[]
+  cashTransactions          CashTransaction[]
+  consultations             Consultation[]
+  labOrders                 LabOrder[]
+  pettyCashApprovals        PettyCash[]       @relation("PettyCashApprover")
+  pettyCashRequests         PettyCash[]       @relation("PettyCashRequester")
+  prescriptions             Prescription[]
+  user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  surgeries                 Surgery[]
+  anesthesiologistSurgeries Surgery[]         @relation("Anesthesiologist")
+
+  @@map("staff_members")
+}
+
+model Patient {
+  id               String            @id @default(cuid())
+  patientId        String            @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           Gender
+  phoneNumber      String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  emergencyPhone   String?
+  bloodType        BloodType?
+  allergies        String?
+  medicalHistory   String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  admissions       Admission[]
+  cashTransactions CashTransaction[]
+  consultations    Consultation[]
+  invoices         Invoice[]
+  labOrders        LabOrder[]
+  account          PatientAccount?
+  payments         Payment[]
+  prescriptions    Prescription[]
+  refunds          Refund[]
+  surgeries        Surgery[]
+
+  @@map("patients")
+}
+
+model PatientAccount {
+  id            String   @id @default(cuid())
+  patientId     String   @unique
+  accountNumber String   @unique
+  balance       Decimal  @default(0) @db.Decimal(10, 2)
+  creditLimit   Decimal? @db.Decimal(10, 2)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_accounts")
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  services    Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id                 String          @id @default(cuid())
+  name               String
+  description        String?
+  categoryId         String
+  basePrice          Decimal         @db.Decimal(10, 2)
+  currentPrice       Decimal         @db.Decimal(10, 2)
+  serviceCode        String?
+  isActive           Boolean         @default(true)
+  requiresPrePayment Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  charges            Charge[]
+  labTests           LabTest[]
+  dailyCharges       DailyCharge[]
+  category           ServiceCategory @relation(fields: [categoryId], references: [id])
+
+  @@map("services")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  patientId     String
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(10, 2)
+  balance       Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(PENDING)
+  dueDate       DateTime?
+  issuedDate    DateTime      @default(now())
+  paidDate      DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  charges       Charge[]
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  payments      Payment[]
+  refunds       Refund[]
+
+  @@map("invoices")
+}
+
+model Charge {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  serviceId   String
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service     Service  @relation(fields: [serviceId], references: [id])
+
+  @@map("charges")
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  invoiceId   String
+  patientId   String
+  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod
+  reference   String?
+  status      PaymentStatus @default(PENDING)
+  processedBy String
+  processedAt DateTime      @default(now())
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id])
+  patient     Patient       @relation(fields: [patientId], references: [id])
+  refunds     Refund[]
+
+  @@map("payments")
+}
+
+model Consultation {
+  id               String           @id @default(cuid())
+  patientId        String
+  doctorId         String
+  appointmentDate  DateTime
+  consultationType ConsultationType
+  diagnosis        String?
+  treatment        String?
+  notes            String?
+  isCompleted      Boolean          @default(false)
+
+  // Billing and Payment Fields
+  consultationFee Decimal @default(0) @db.Decimal(10, 2) // Base consultation fee
+  totalAmount     Decimal @default(0) @db.Decimal(10, 2) // Total consultation cost
+  paidAmount      Decimal @default(0) @db.Decimal(10, 2) // Amount paid so far
+  balance         Decimal @default(0) @db.Decimal(10, 2) // Remaining balance
+  isPaid          Boolean @default(false) // Payment status
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor  StaffMember @relation(fields: [doctorId], references: [id])
+  patient Patient     @relation(fields: [patientId], references: [id])
+
+  @@map("consultations")
+}
+
+model LabOrder {
+  id          String         @id @default(cuid())
+  patientId   String
+  doctorId    String
+  orderDate   DateTime       @default(now())
+  status      LabOrderStatus @default(PENDING)
+  isPaid      Boolean        @default(false)
+  totalAmount Decimal        @default(0) @db.Decimal(10, 2) // Total cost of all tests
+  paidAmount  Decimal        @default(0) @db.Decimal(10, 2) // Amount paid so far
+  balance     Decimal        @default(0) @db.Decimal(10, 2) // Remaining balance
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  doctor      StaffMember    @relation(fields: [doctorId], references: [id])
+  patient     Patient        @relation(fields: [patientId], references: [id])
+  tests       LabTest[]
+
+  @@map("lab_orders")
+}
+
+model LabTest {
+  id         String        @id @default(cuid())
+  orderId    String
+  serviceId  String
+  result     String?
+  status     LabTestStatus @default(PENDING)
+  unitPrice  Decimal       @db.Decimal(10, 2) // Price per test at time of order
+  totalPrice Decimal       @db.Decimal(10, 2) // Total price for this test
+  isPaid     Boolean       @default(false) // Payment status for this specific test
+  notes      String? // Additional notes for the test
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  order      LabOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service    Service       @relation(fields: [serviceId], references: [id])
+
+  @@map("lab_tests")
+}
+
+model Prescription {
+  id               String             @id @default(cuid())
+  patientId        String
+  doctorId         String
+  prescriptionDate DateTime           @default(now())
+  status           PrescriptionStatus @default(PENDING)
+  isPaid           Boolean            @default(false)
+  totalAmount      Decimal            @default(0) @db.Decimal(10, 2) // Total cost of all medications
+  paidAmount       Decimal            @default(0) @db.Decimal(10, 2) // Amount paid so far
+  balance          Decimal            @default(0) @db.Decimal(10, 2) // Remaining balance
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // Relations
+  medications PrescriptionMedication[]
+  doctor      StaffMember              @relation(fields: [doctorId], references: [id])
+  patient     Patient                  @relation(fields: [patientId], references: [id])
+
+  @@map("prescriptions")
+}
+
+model PrescriptionMedication {
+  id             String   @id @default(cuid())
+  prescriptionId String
+  medicationId   String // Changed from serviceId to medicationId
+  dosage         String
+  frequency      String
+  duration       String
+  quantity       Int // Number of units to dispense
+  instructions   String?
+  unitPrice      Decimal  @db.Decimal(10, 2) // Price per unit at time of prescription
+  totalPrice     Decimal  @db.Decimal(10, 2) // Total price for this medication
+  isPaid         Boolean  @default(false) // Payment status for this specific medication
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  prescription   Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medication     Medication            @relation(fields: [medicationId], references: [id])
+  dispensedItems DispensedMedication[]
+
+  @@map("prescription_medications")
+}
+
+model Medication {
+  id                   String   @id @default(cuid())
+  name                 String
+  genericName          String?
+  strength             String?
+  form                 String?
+  manufacturer         String?
+  drugCode             String   @unique // Unique drug identifier
+  category             String? // Antibiotic, Painkiller, etc.
+  controlledDrug       Boolean  @default(false) // Controlled substance flag
+  requiresPrescription Boolean  @default(true)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relations
+  inventoryItems    MedicationInventory[]
+  prescriptionItems PrescriptionMedication[]
+
+  @@map("medications")
+}
+
+model MedicationInventory {
+  id                String   @id @default(cuid())
+  medicationId      String
+  batchNumber       String   @unique
+  expiryDate        DateTime
+  quantity          Int // Total quantity in this batch
+  availableQuantity Int // Available quantity (not reserved)
+  reservedQuantity  Int      @default(0) // Quantity reserved for prescriptions
+  unitCost          Decimal  @db.Decimal(10, 4) // Cost per unit
+  sellingPrice      Decimal  @db.Decimal(10, 2) // Selling price per unit
+  supplier          String?
+  purchaseDate      DateTime @default(now())
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  medication     Medication            @relation(fields: [medicationId], references: [id])
+  dispensedItems DispensedMedication[]
+
+  @@map("medication_inventory")
+}
+
+model DispensedMedication {
+  id                       String   @id @default(cuid())
+  prescriptionMedicationId String
+  inventoryItemId          String
+  quantity                 Int // Quantity dispensed from this batch
+  dispensedBy              String // Staff member ID
+  dispensedAt              DateTime @default(now())
+  batchNumber              String // For tracking
+  expiryDate               DateTime // From inventory
+  notes                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  // Relations
+  prescriptionMedication PrescriptionMedication @relation(fields: [prescriptionMedicationId], references: [id])
+  inventoryItem          MedicationInventory    @relation(fields: [inventoryItemId], references: [id])
+
+  @@map("dispensed_medications")
+}
+
+model Admission {
+  id            String          @id @default(cuid())
+  patientId     String
+  doctorId      String
+  wardId        String?
+  admissionDate DateTime        @default(now())
+  dischargeDate DateTime?
+  wardType      WardType
+  bedNumber     String?
+  status        AdmissionStatus @default(ADMITTED)
+  depositAmount Decimal         @db.Decimal(10, 2)
+  notes         String?
+  diagnosis     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  doctor        StaffMember     @relation(fields: [doctorId], references: [id])
+  patient       Patient         @relation(fields: [patientId], references: [id])
+  ward          Ward?           @relation(fields: [wardId], references: [id])
+  dailyCharges  DailyCharge[]
+  surgeries     Surgery[]
+
+  @@map("admissions")
+}
+
+model Ward {
+  id        String   @id @default(cuid())
+  name      String
+  wardType  WardType
+  floor     String?
+  capacity  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  beds       Bed[]
+  admissions Admission[]
+  surgeries  Surgery[]
+
+  @@map("wards")
+}
+
+model Bed {
+  id         String   @id @default(cuid())
+  bedNumber  String   @unique
+  wardId     String
+  isOccupied Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  ward Ward @relation(fields: [wardId], references: [id])
+
+  @@map("beds")
+}
+
+model DailyCharge {
+  id          String   @id @default(cuid())
+  admissionId String
+  serviceId   String
+  amount      Decimal  @db.Decimal(10, 2)
+  description String
+  chargeDate  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  admission Admission @relation(fields: [admissionId], references: [id])
+  service   Service   @relation(fields: [serviceId], references: [id])
+
+  @@map("daily_charges")
+}
+
+model Surgery {
+  id            String        @id @default(cuid())
+  patientId     String
+  surgeonId     String
+  surgeryDate   DateTime
+  surgeryType   String
+  operatingRoom String?
+  duration      Int? // Duration in minutes
+  status        SurgeryStatus @default(SCHEDULED)
+  notes         String?
+
+  // Billing and Cost Fields
+  surgeryFee    Decimal @default(0) @db.Decimal(10, 2) // Base surgery fee
+  anesthesiaFee Decimal @default(0) @db.Decimal(10, 2) // Anesthesia service fee
+  pacuCharges   Decimal @default(0) @db.Decimal(10, 2) // Post-anesthesia care unit charges
+  totalAmount   Decimal @default(0) @db.Decimal(10, 2) // Total surgery cost
+  paidAmount    Decimal @default(0) @db.Decimal(10, 2) // Amount paid so far
+  balance       Decimal @default(0) @db.Decimal(10, 2) // Remaining balance
+
+  // Inpatient Stay Fields
+  requiresInpatient Boolean @default(false) // Whether inpatient stay is required
+  admissionId       String? // Link to admission if inpatient stay required
+  wardId            String? // Ward assignment for inpatient stay
+
+  // Operating Room Booking
+  roomBookingStart  DateTime? // Operating room booking start time
+  roomBookingEnd    DateTime? // Operating room booking end time
+  roomBookingStatus RoomBookingStatus @default(PENDING)
+
+  // Anesthesia Details
+  anesthesiaType     String? // Type of anesthesia used
+  anesthesiologistId String? // Anesthesiologist assigned
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  patient               Patient                @relation(fields: [patientId], references: [id])
+  surgeon               StaffMember            @relation(fields: [surgeonId], references: [id])
+  admission             Admission?             @relation(fields: [admissionId], references: [id])
+  ward                  Ward?                  @relation(fields: [wardId], references: [id])
+  anesthesiologist      StaffMember?           @relation("Anesthesiologist", fields: [anesthesiologistId], references: [id])
+  surgicalProcedures    SurgicalProcedure[]
+  operatingRoomBookings OperatingRoomBooking[]
+
+  @@map("surgeries")
+}
+
+model SurgicalProcedure {
+  id            String   @id @default(cuid())
+  surgeryId     String
+  procedureName String
+  description   String?
+  cost          Decimal  @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  surgery Surgery @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+
+  @@map("surgical_procedures")
+}
+
+model OperatingRoomBooking {
+  id          String            @id @default(cuid())
+  surgeryId   String
+  roomNumber  String
+  bookingDate DateTime
+  startTime   DateTime
+  endTime     DateTime
+  status      RoomBookingStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  surgery Surgery @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+
+  @@map("operating_room_bookings")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  tableName String
+  recordId  String
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model CashTransaction {
+  id              String            @id @default(cuid())
+  cashierId       String
+  patientId       String?
+  transactionType TransactionType
+  amount          Decimal           @db.Decimal(10, 2)
+  description     String
+  referenceNumber String?
+  notes           String?
+  status          TransactionStatus @default(COMPLETED)
+  transactionDate DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  cashier         StaffMember       @relation(fields: [cashierId], references: [id])
+  patient         Patient?          @relation(fields: [patientId], references: [id])
+
+  @@map("cash_transactions")
+}
+
+model PettyCash {
+  id              String          @id @default(cuid())
+  requesterId     String
+  approverId      String?
+  amount          Decimal         @db.Decimal(10, 2)
+  purpose         String
+  description     String?
+  expectedDate    DateTime?
+  notes           String?
+  status          PettyCashStatus @default(PENDING)
+  requestDate     DateTime        @default(now())
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  approver        StaffMember?    @relation("PettyCashApprover", fields: [approverId], references: [id])
+  requester       StaffMember     @relation("PettyCashRequester", fields: [requesterId], references: [id])
+
+  @@map("petty_cash")
+}
+
+model Refund {
+  id              String       @id @default(cuid())
+  paymentId       String
+  patientId       String
+  invoiceId       String
+  amount          Decimal      @db.Decimal(10, 2)
+  reason          String
+  notes           String?
+  referenceNumber String?
+  status          RefundStatus @default(PENDING)
+  refundDate      DateTime     @default(now())
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  invoice         Invoice      @relation(fields: [invoiceId], references: [id])
+  patient         Patient      @relation(fields: [patientId], references: [id])
+  payment         Payment      @relation(fields: [paymentId], references: [id])
+
+  @@map("refunds")
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  NURSE
+  LAB_TECHNICIAN
+  PHARMACIST
+  CASHIER
+  RECEPTIONIST
+  ACCOUNTANT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum BloodType {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  INSURANCE
+  CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum ConsultationType {
+  GENERAL
+  SPECIALIST
+  FOLLOW_UP
+  EMERGENCY
+}
+
+enum LabOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LabTestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PrescriptionStatus {
+  PENDING
+  DISPENSED
+  CANCELLED
+}
+
+enum AdmissionStatus {
+  ADMITTED
+  DISCHARGED
+  TRANSFERRED
+  CANCELLED
+}
+
+enum WardType {
+  GENERAL
+  PRIVATE
+  ICU
+  NURSERY
+  MATERNITY
+  PEDIATRIC
+}
+
+enum SurgeryStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RoomBookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum TransactionType {
+  CASH_IN
+  CASH_OUT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum PettyCashStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

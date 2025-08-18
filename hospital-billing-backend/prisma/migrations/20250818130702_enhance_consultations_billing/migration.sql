@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "public"."consultations" ADD COLUMN     "balance" DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "consultationFee" DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "isPaid" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "paidAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "totalAmount" DECIMAL(10,2) NOT NULL DEFAULT 0;
