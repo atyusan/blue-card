@@ -22,22 +22,30 @@ async function main() {
   await seedUsers();
   await seedStaffMembers();
   await seedPatients();
+  await seedPatientAccounts();
   await seedServiceCategories();
   await seedServices();
   await seedWards();
   await seedBeds();
   await seedAdmissions();
+  await seedDailyCharges();
   await seedConsultations();
   await seedLabOrders();
+  await seedLabTests();
   await seedMedications();
   await seedMedicationInventory();
   await seedPrescriptions();
+  await seedPrescriptionMedications();
   await seedSurgeries();
+  await seedSurgicalProcedures();
+  await seedOperatingRoomBookings();
   await seedInvoices();
   await seedCharges();
   await seedPayments();
+  await seedRefunds();
   await seedCashTransactions();
   await seedPettyCash();
+  await seedAuditLogs();
 
   console.log('✅ Database seeding completed successfully!');
 }
@@ -165,6 +173,291 @@ async function seedMedicationInventory() {
   }
 
   console.log('✅ Created medication inventory items');
+}
+
+// ===== PATIENT ACCOUNTS SEEDING =====
+
+async function seedPatientAccounts() {
+  console.log('💰 Seeding patient accounts...');
+
+  const patients = await prisma.patient.findMany();
+
+  for (const patient of patients) {
+    await prisma.patientAccount.create({
+      data: {
+        patientId: patient.id,
+        accountNumber: `ACC-${patient.patientId}-${Date.now()}`,
+        balance: Math.random() * 1000, // Random balance between 0-1000
+        creditLimit: 5000,
+      },
+    });
+  }
+
+  console.log(`✅ Created ${patients.length} patient accounts`);
+}
+
+// ===== DAILY CHARGES SEEDING =====
+
+async function seedDailyCharges() {
+  console.log('📅 Seeding daily charges...');
+
+  const admissions = await prisma.admission.findMany({
+    where: { status: 'ADMITTED' },
+  });
+
+  for (const admission of admissions) {
+    // Create daily charges for the last 7 days
+    for (let i = 0; i < 7; i++) {
+      const chargeDate = new Date();
+      chargeDate.setDate(chargeDate.getDate() - i);
+
+      // Get a random service for daily charges
+      const services = await prisma.service.findMany();
+      const randomService =
+        services[Math.floor(Math.random() * services.length)];
+
+      await prisma.dailyCharge.create({
+        data: {
+          admissionId: admission.id,
+          serviceId: randomService.id,
+          chargeDate,
+          description: `Daily ward charges for ${chargeDate.toDateString()}`,
+          amount: Math.random() * 200 + 100, // Random amount between 100-300
+        },
+      });
+    }
+  }
+
+  console.log('✅ Created daily charges for admissions');
+}
+
+// ===== LAB TESTS SEEDING =====
+
+async function seedLabTests() {
+  console.log('🧪 Seeding lab tests...');
+
+  const labOrders = await prisma.labOrder.findMany();
+  const services = await prisma.service.findMany({
+    where: { category: { name: 'Laboratory' } },
+  });
+
+  for (const order of labOrders) {
+    // Create 2-4 tests per order
+    const numTests = Math.floor(Math.random() * 3) + 2;
+
+    for (let i = 0; i < numTests; i++) {
+      const service = services[Math.floor(Math.random() * services.length)];
+      const unitPrice = Math.random() * 50 + 25; // Random price between 25-75
+      const totalPrice = unitPrice;
+
+      await prisma.labTest.create({
+        data: {
+          orderId: order.id,
+          serviceId: service.id,
+          unitPrice,
+          totalPrice,
+          status: Math.random() > 0.3 ? 'COMPLETED' : 'PENDING', // 70% completed
+          result:
+            Math.random() > 0.3 ? `Test result for ${service.name}` : null,
+          notes: Math.random() > 0.5 ? 'Sample collected and processed' : null,
+        },
+      });
+    }
+  }
+
+  console.log('✅ Created lab tests for orders');
+}
+
+// ===== PRESCRIPTION MEDICATIONS SEEDING =====
+
+async function seedPrescriptionMedications() {
+  console.log('💊 Seeding prescription medications...');
+
+  const prescriptions = await prisma.prescription.findMany();
+  const medications = await prisma.medication.findMany();
+
+  for (const prescription of prescriptions) {
+    // Create 1-3 medications per prescription
+    const numMedications = Math.floor(Math.random() * 3) + 1;
+
+    for (let i = 0; i < numMedications; i++) {
+      const medication =
+        medications[Math.floor(Math.random() * medications.length)];
+      const quantity = Math.floor(Math.random() * 30) + 10; // Random quantity 10-40
+      const unitPrice = Math.random() * 5 + 1; // Random price 1-6
+      const totalPrice = unitPrice * quantity;
+
+      await prisma.prescriptionMedication.create({
+        data: {
+          prescriptionId: prescription.id,
+          medicationId: medication.id,
+          dosage: `${Math.floor(Math.random() * 3) + 1} tablet(s)`,
+          frequency: ['Once daily', 'Twice daily', 'Three times daily'][
+            Math.floor(Math.random() * 3)
+          ],
+          duration: `${Math.floor(Math.random() * 7) + 3} days`,
+          quantity,
+          unitPrice,
+          totalPrice,
+          instructions: 'Take with food',
+          isPaid: Math.random() > 0.4, // 60% paid
+        },
+      });
+    }
+  }
+
+  console.log('✅ Created prescription medications');
+}
+
+// ===== SURGICAL PROCEDURES SEEDING =====
+
+async function seedSurgicalProcedures() {
+  console.log('🔪 Seeding surgical procedures...');
+
+  const surgeries = await prisma.surgery.findMany();
+
+  for (const surgery of surgeries) {
+    // Create 1-3 procedures per surgery
+    const numProcedures = Math.floor(Math.random() * 3) + 1;
+
+    for (let i = 0; i < numProcedures; i++) {
+      const procedureNames = [
+        'Incision and drainage',
+        'Suturing',
+        'Biopsy',
+        'Excision',
+        'Repair',
+        'Reconstruction',
+      ];
+
+      await prisma.surgicalProcedure.create({
+        data: {
+          surgeryId: surgery.id,
+          procedureName:
+            procedureNames[Math.floor(Math.random() * procedureNames.length)],
+          description: 'Standard surgical procedure',
+          cost: Math.random() * 500 + 200, // Random cost 200-700
+        },
+      });
+    }
+  }
+
+  console.log('✅ Created surgical procedures');
+}
+
+// ===== OPERATING ROOM BOOKINGS SEEDING =====
+
+async function seedOperatingRoomBookings() {
+  console.log('🏥 Seeding operating room bookings...');
+
+  const surgeries = await prisma.surgery.findMany({
+    where: { status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
+  });
+
+  for (const surgery of surgeries) {
+    const roomNumbers = ['OR-1', 'OR-2', 'OR-3', 'OR-4'];
+    const roomNumber =
+      roomNumbers[Math.floor(Math.random() * roomNumbers.length)];
+
+    const startTime = new Date(surgery.surgeryDate);
+    startTime.setHours(9, 0, 0, 0); // 9 AM
+
+    const endTime = new Date(startTime);
+    endTime.setHours(startTime.getHours() + Math.floor(Math.random() * 4) + 2); // 2-6 hours
+
+    await prisma.operatingRoomBooking.create({
+      data: {
+        surgeryId: surgery.id,
+        roomNumber,
+        bookingDate: surgery.surgeryDate,
+        startTime,
+        endTime,
+        status: 'CONFIRMED',
+        notes: 'Operating room confirmed for surgery',
+      },
+    });
+  }
+
+  console.log('✅ Created operating room bookings');
+}
+
+// ===== REFUNDS SEEDING =====
+
+async function seedRefunds() {
+  console.log('💰 Seeding refunds...');
+
+  const payments = await prisma.payment.findMany({
+    where: { status: 'COMPLETED' },
+  });
+
+  // Create refunds for 10% of completed payments
+  const refundCount = Math.floor(payments.length * 0.1);
+
+  for (let i = 0; i < refundCount; i++) {
+    const payment = payments[i];
+    const refundAmount = Math.random() * Number(payment.amount) * 0.5; // Up to 50% refund
+
+    await prisma.refund.create({
+      data: {
+        paymentId: payment.id,
+        patientId: payment.patientId,
+        invoiceId: payment.invoiceId,
+        amount: refundAmount,
+        reason: ['Patient request', 'Service not provided', 'Overpayment'][
+          Math.floor(Math.random() * 3)
+        ],
+        status: Math.random() > 0.3 ? 'APPROVED' : 'PENDING',
+        notes: 'Refund processed',
+      },
+    });
+  }
+
+  console.log(`✅ Created ${refundCount} refunds`);
+}
+
+// ===== AUDIT LOGS SEEDING =====
+
+async function seedAuditLogs() {
+  console.log('📝 Seeding audit logs...');
+
+  const users = await prisma.user.findMany();
+  const actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT'];
+  const modules = [
+    'User',
+    'Patient',
+    'Billing',
+    'Pharmacy',
+    'Laboratory',
+    'Surgery',
+  ];
+
+  // Create audit logs for the last 30 days
+  for (let i = 0; i < 30; i++) {
+    const logDate = new Date();
+    logDate.setDate(logDate.getDate() - i);
+
+    const numLogs = Math.floor(Math.random() * 20) + 10; // 10-30 logs per day
+
+    for (let j = 0; j < numLogs; j++) {
+      const user = users[Math.floor(Math.random() * users.length)];
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      const module = modules[Math.floor(Math.random() * modules.length)];
+
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action,
+          tableName: module,
+          recordId: `record-${Math.random().toString(36).substr(2, 9)}`,
+          ipAddress: '192.168.1.100',
+          userAgent:
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+    }
+  }
+
+  console.log('✅ Created audit logs');
 }
 
 async function clearDatabase() {
