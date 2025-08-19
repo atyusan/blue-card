@@ -1,3 +1,6 @@
+// Load New Relic agent first
+import 'newrelic';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -104,14 +107,12 @@ async function bootstrap() {
   const port = configService.get<number>('app.port') || 3000;
   await app.listen(port);
 
-  console.log(
-    `🚀 Hospital Billing System is running on: http://localhost:${port}`,
-  );
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
   console.log(
     `📚 API Documentation available at: http://localhost:${port}/${apiDocsPath}`,
   );
   console.log(`🌍 Environment: ${nodeEnv}`);
-  console.log(`🔗 API Base URL: http://localhost:${port}/${apiPrefix}`);
+  console.log(`🔗 API Base URL: ${apiPrefix}`);
 }
 
 bootstrap();

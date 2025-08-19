@@ -25,6 +25,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { CashOfficeModule } from './cash-office/cash-office.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PaystackModule } from './paystack/paystack.module';
+import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { PaystackModule } from './paystack/paystack.module';
       ],
       inject: [ConfigService],
     }),
+    LoggingModule,
     DatabaseModule,
     AuthModule,
     UsersModule,
