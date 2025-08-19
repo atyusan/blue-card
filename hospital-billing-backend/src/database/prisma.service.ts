@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
@@ -6,12 +7,21 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor() {
+  constructor(private configService: ConfigService) {
+    const nodeEnv = configService.get<string>('app.nodeEnv') || 'development';
+    const dbLogQuery = configService.get<boolean>('databaseLogging.query') ?? (nodeEnv === 'development');
+    const dbLogError = configService.get<boolean>('databaseLogging.error') ?? true;
+    const dbLogWarn = configService.get<boolean>('databaseLogging.warn') ?? (nodeEnv === 'development');
+    const dbLogInfo = configService.get<boolean>('databaseLogging.info') ?? false;
+
+    const logLevels: Array<'query' | 'error' | 'warn' | 'info'> = [];
+    if (dbLogQuery) logLevels.push('query');
+    if (dbLogError) logLevels.push('error');
+    if (dbLogWarn) logLevels.push('warn');
+    if (dbLogInfo) logLevels.push('info');
+
     super({
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'error', 'warn']
-          : ['error'],
+      log: logLevels.length > 0 ? logLevels : ['error'],
       errorFormat: 'pretty',
     });
   }
@@ -27,7 +37,8 @@ export class PrismaService
   }
 
   async cleanDatabase() {
-    if (process.env.NODE_ENV === 'test') {
+    const nodeEnv = this.configService.get<string>('app.nodeEnv');
+    if (nodeEnv === 'test') {
       const tablenames = await this.$queryRaw<
         Array<{ tablename: string }>
       >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;

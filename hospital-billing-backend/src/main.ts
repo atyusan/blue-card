@@ -8,37 +8,55 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Global prefix
-  app.setGlobalPrefix('api/v1');
+  // Global prefix from environment variable
+  const apiPrefix = configService.get<string>('app.apiPrefix') || 'api/v1';
+  app.setGlobalPrefix(apiPrefix);
 
-  // Global validation pipe
+  // Global validation pipe with environment variable configuration
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+      whitelist: configService.get<boolean>('validation.whitelist') ?? true,
+      forbidNonWhitelisted:
+        configService.get<boolean>('validation.forbidNonWhitelisted') ?? true,
+      transform: configService.get<boolean>('validation.transform') ?? true,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion:
+          configService.get<boolean>('validation.transformImplicit') ?? true,
       },
     }),
   );
 
-  // CORS configuration
+  // CORS configuration from environment variables
+  const nodeEnv = configService.get<string>('app.nodeEnv') || 'development';
+  const corsOrigins =
+    nodeEnv === 'production'
+      ? configService.get<string>('cors.originProduction')?.split(',') || [
+          'https://yourdomain.com',
+        ]
+      : configService.get<string>('cors.originDevelopment')?.split(',') || [
+          'http://localhost:3000',
+          'http://localhost:3001',
+        ];
+
   app.enableCors({
-    origin:
-      configService.get('NODE_ENV') === 'production'
-        ? ['https://yourdomain.com']
-        : ['http://localhost:3000', 'http://localhost:3001'],
+    origin: corsOrigins,
     credentials: true,
   });
 
-  // Swagger documentation
+  // Swagger documentation with environment variable configuration
+  const swaggerTitle =
+    configService.get<string>('swagger.title') || 'Hospital Billing System API';
+  const swaggerDescription =
+    configService.get<string>('swagger.description') ||
+    'Comprehensive API for managing hospital billing, patients, services, and payments';
+  const swaggerVersion = configService.get<string>('swagger.version') || '1.0';
+  const swaggerPersistAuth =
+    configService.get<boolean>('swagger.persistAuthorization') ?? true;
+
   const config = new DocumentBuilder()
-    .setTitle('Hospital Billing System API')
-    .setDescription(
-      'Comprehensive API for managing hospital billing, patients, services, and payments',
-    )
-    .setVersion('1.0')
+    .setTitle(swaggerTitle)
+    .setDescription(swaggerDescription)
+    .setVersion(swaggerVersion)
     .addBearerAuth(
       {
         type: 'http',
@@ -66,27 +84,34 @@ async function bootstrap() {
       'Cash Office Integration',
       'Cash office operations and reconciliation',
     )
+    .addTag('Paystack Integration', 'Paystack Terminal payment processing')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
+  const apiDocsPath =
+    configService.get<string>('app.apiDocsPath') || 'api/docs';
+
+  SwaggerModule.setup(apiDocsPath, app, document, {
     swaggerOptions: {
-      persistAuthorization: true,
+      persistAuthorization: swaggerPersistAuth,
     },
   });
 
   // Global exception filter
   app.useGlobalFilters();
 
-  const port = configService.get('PORT') || 3000;
+  // Port configuration from environment variable
+  const port = configService.get<number>('app.port') || 3000;
   await app.listen(port);
 
   console.log(
     `🚀 Hospital Billing System is running on: http://localhost:${port}`,
   );
   console.log(
-    `📚 API Documentation available at: http://localhost:${port}/api/docs`,
+    `📚 API Documentation available at: http://localhost:${port}/${apiDocsPath}`,
   );
+  console.log(`🌍 Environment: ${nodeEnv}`);
+  console.log(`🔗 API Base URL: http://localhost:${port}/${apiPrefix}`);
 }
 
 bootstrap();

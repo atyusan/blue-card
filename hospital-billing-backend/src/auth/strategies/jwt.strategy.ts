@@ -10,14 +10,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     private usersService: UsersService,
   ) {
-    const jwtSecret = configService.get<string>('JWT_SECRET');
+    const jwtSecret = configService.get<string>('jwt.secret');
+    const jwtIssuer = configService.get<string>('jwt.issuer') || 'hospital-billing-system';
+    const jwtAudience = configService.get<string>('jwt.audience') || 'hospital-users';
+    
     if (!jwtSecret) {
       throw new Error('JWT_SECRET is not defined in configuration');
     }
+    
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
+      issuer: jwtIssuer,
+      audience: jwtAudience,
     });
   }
 

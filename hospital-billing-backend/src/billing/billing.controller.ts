@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -342,5 +344,45 @@ export class BillingController {
       new Date(startDate),
       new Date(endDate),
     );
+  }
+
+  // ===== PAYSTACK INTEGRATION ENDPOINTS =====
+
+  @Post('paystack/invoices')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createInvoiceWithPaystack(
+    @Body() createInvoiceDto: CreateInvoiceDto,
+    @Body('lineItems')
+    lineItems?: Array<{ name: string; amount: number; quantity: number }>,
+  ) {
+    return await this.billingService.createInvoiceWithPaystack(
+      createInvoiceDto,
+      lineItems,
+    );
+  }
+
+  @Get('paystack/invoices')
+  @UseGuards(JwtAuthGuard)
+  async getPaystackInvoices(
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    return await this.billingService.getPaystackInvoices(
+      Number(page),
+      Number(limit),
+    );
+  }
+
+  @Get('paystack/invoices/:id')
+  @UseGuards(JwtAuthGuard)
+  async getPaystackInvoiceDetails(@Param('id') id: string) {
+    return await this.billingService.getPaystackInvoiceDetails(id);
+  }
+
+  @Get('paystack/stats')
+  @UseGuards(JwtAuthGuard)
+  async getPaystackPaymentStats() {
+    return await this.billingService.getPaystackPaymentStats();
   }
 }

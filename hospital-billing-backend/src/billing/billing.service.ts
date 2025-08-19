@@ -6,13 +6,26 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { CreateChargeDto } from './dto/create-charge.dto';
-import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { PaystackService } from '../paystack/paystack.service';
+import {
+  CreateInvoiceDto,
+  UpdateInvoiceDto,
+  CreateChargeDto,
+  UpdateChargeDto,
+} from './dto';
+import {
+  InvoiceResponse,
+  ChargeResponse,
+  InvoiceSearchResult,
+  ChargeSearchResult,
+} from './interfaces';
 
 @Injectable()
 export class BillingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paystackService: PaystackService,
+  ) {}
 
   // Invoice Management
   async createInvoice(createInvoiceDto: CreateInvoiceDto) {
@@ -731,6 +744,260 @@ export class BillingService {
         status: invoice.status,
         issuedDate: invoice.issuedDate,
       })),
+    };
+  }
+
+  /**
+   * Create invoice with Paystack integration
+   */
+  async createInvoiceWithPaystack(
+    createInvoiceDto: CreateInvoiceDto,
+    lineItems?: Array<{ name: string; amount: number; quantity: number }>,
+  ) {
+    try {
+      // Create local invoice first
+      const invoice = await this.createInvoice(createInvoiceDto);
+
+      // Create Paystack invoice
+      const paystackInvoice = await this.paystackService.createInvoice(
+        invoice.patientId,
+        Number(invoice.totalAmount),
+        invoice.notes || 'Hospital services invoice',
+        lineItems,
+      );
+
+      // Update local invoice with Paystack reference
+      const updatedInvoice = await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          paystackInvoiceId: paystackInvoice.paystackInvoiceId,
+          paystackReference: paystackInvoice.requestCode,
+        },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              patientId: true,
+            },
+          },
+          charges: {
+            include: {
+              service: {
+                select: {
+                  id: true,
+                  name: true,
+                  serviceCode: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              method: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      return this.mapToInvoiceResponse(updatedInvoice);
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to create invoice with Paystack: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Get Paystack invoice details
+   */
+  async getPaystackInvoiceDetails(invoiceId: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        paystackInvoice: true,
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            patientId: true,
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    if (!invoice.paystackInvoice) {
+      throw new BadRequestException('This invoice is not linked to Paystack');
+    }
+
+    return {
+      localInvoice: this.mapToInvoiceResponse(invoice),
+      paystackInvoice: invoice.paystackInvoice,
+    };
+  }
+
+  /**
+   * Get all Paystack invoices
+   */
+  async getPaystackInvoices(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          paystackInvoiceId: { not: null },
+        },
+        skip,
+        take: limit,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              patientId: true,
+            },
+          },
+          paystackInvoice: true,
+          charges: {
+            include: {
+              service: {
+                select: {
+                  id: true,
+                  name: true,
+                  serviceCode: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              method: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          paystackInvoiceId: { not: null },
+        },
+      }),
+    ]);
+
+    return {
+      invoices: invoices.map((invoice) => this.mapToInvoiceResponse(invoice)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Get Paystack payment statistics
+   */
+  async getPaystackPaymentStats() {
+    const [
+      totalInvoices,
+      paidInvoices,
+      pendingInvoices,
+      totalAmount,
+      paidAmount,
+    ] = await Promise.all([
+      this.prisma.invoice.count({
+        where: { paystackInvoiceId: { not: null } },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          paystackInvoiceId: { not: null },
+          status: 'PAID',
+        },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          paystackInvoiceId: { not: null },
+          status: 'PENDING',
+        },
+      }),
+      this.prisma.invoice.aggregate({
+        where: { paystackInvoiceId: { not: null } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: {
+          paystackInvoiceId: { not: null },
+          status: 'PAID',
+        },
+        _sum: { paidAmount: true },
+      }),
+    ]);
+
+    return {
+      totalInvoices,
+      paidInvoices,
+      pendingInvoices,
+      totalAmount: Number(totalAmount._sum.totalAmount || 0),
+      paidAmount: Number(paidAmount._sum.paidAmount || 0),
+      pendingAmount:
+        Number(totalAmount._sum.totalAmount || 0) -
+        Number(paidAmount._sum.paidAmount || 0),
+    };
+  }
+
+  private mapToInvoiceResponse(invoice: any) {
+    return {
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      patient: {
+        id: invoice.patient.id,
+        patientId: invoice.patient.patientId,
+        firstName: invoice.patient.firstName,
+        lastName: invoice.patient.lastName,
+      },
+      totalAmount: Number(invoice.totalAmount),
+      paidAmount: Number(invoice.paidAmount),
+      balance: Number(invoice.balance),
+      status: invoice.status,
+      issuedDate: invoice.issuedDate,
+      dueDate: invoice.dueDate,
+      notes: invoice.notes,
+      charges: invoice.charges.map((charge: any) => ({
+        id: charge.id,
+        service: {
+          id: charge.service.id,
+          name: charge.service.name,
+          serviceCode: charge.service.serviceCode,
+        },
+        description: charge.description,
+        quantity: charge.quantity,
+        unitPrice: Number(charge.unitPrice),
+        totalPrice: Number(charge.totalPrice),
+      })),
+      payments: invoice.payments.map((payment: any) => ({
+        id: payment.id,
+        amount: Number(payment.amount),
+        method: payment.method,
+        status: payment.status,
+        processedAt: payment.processedAt,
+        notes: payment.notes,
+      })),
+      paystackInvoiceId: invoice.paystackInvoiceId,
+      paystackReference: invoice.paystackReference,
     };
   }
 }

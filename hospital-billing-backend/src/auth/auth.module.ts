@@ -15,9 +15,15 @@ import { UsersModule } from '../users/users.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '24h',
+          expiresIn: configService.get<string>('jwt.expiresIn') || '24h',
+          issuer: configService.get<string>('jwt.issuer') || 'hospital-billing-system',
+          audience: configService.get<string>('jwt.audience') || 'hospital-users',
+        },
+        verifyOptions: {
+          issuer: configService.get<string>('jwt.issuer') || 'hospital-billing-system',
+          audience: configService.get<string>('jwt.audience') || 'hospital-users',
         },
       }),
       inject: [ConfigService],
