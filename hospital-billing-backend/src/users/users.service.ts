@@ -149,6 +149,26 @@ export class UsersService {
     });
   }
 
+  findByUsernameOrEmail(identifier: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        OR: [{ username: identifier }, { email: identifier }],
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        password: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto) {
     const { password, ...updateData } = updateUserDto;
 

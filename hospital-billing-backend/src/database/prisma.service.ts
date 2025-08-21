@@ -9,16 +9,22 @@ export class PrismaService
 {
   constructor(private configService: ConfigService) {
     const nodeEnv = configService.get<string>('app.nodeEnv') || 'development';
-    const dbLogQuery = configService.get<boolean>('databaseLogging.query') ?? (nodeEnv === 'development');
-    const dbLogError = configService.get<boolean>('databaseLogging.error') ?? true;
-    const dbLogWarn = configService.get<boolean>('databaseLogging.warn') ?? (nodeEnv === 'development');
-    const dbLogInfo = configService.get<boolean>('databaseLogging.info') ?? false;
+    const dbLogQuery =
+      configService.get<boolean>('databaseLogging.query') ??
+      nodeEnv === 'development';
+    const dbLogError =
+      configService.get<boolean>('databaseLogging.error') ?? true;
+    const dbLogWarn =
+      configService.get<boolean>('databaseLogging.warn') ??
+      nodeEnv === 'development';
+    const dbLogInfo =
+      configService.get<boolean>('databaseLogging.info') ?? false;
 
     const logLevels: Array<'query' | 'error' | 'warn' | 'info'> = [];
-    if (dbLogQuery) logLevels.push('query');
+    // if (dbLogQuery) logLevels.push('query');
     if (dbLogError) logLevels.push('error');
-    if (dbLogWarn) logLevels.push('warn');
-    if (dbLogInfo) logLevels.push('info');
+    // if (dbLogWarn) logLevels.push('warn');
+    // if (dbLogInfo) logLevels.push('info');
 
     super({
       log: logLevels.length > 0 ? logLevels : ['error'],

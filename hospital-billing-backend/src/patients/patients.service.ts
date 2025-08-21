@@ -37,13 +37,64 @@ export class PatientsService {
       }
     }
 
+    // Create user record for the patient if email is provided
+    let userId: string | undefined;
+    if (createPatientDto.email) {
+      const username = await this.generateUniqueUsername(
+        createPatientDto.firstName,
+        createPatientDto.lastName,
+      );
+      const tempPassword = this.generateTempPassword();
+
+      const user = await this.prisma.user.create({
+        data: {
+          email: createPatientDto.email,
+          username,
+          password: tempPassword, // This should be hashed in production
+          firstName: createPatientDto.firstName,
+          lastName: createPatientDto.lastName,
+          role: 'PATIENT',
+          isActive: true,
+        },
+      });
+      userId = user.id;
+    }
+
+    // Transform the DTO to match the new database structure
+    const patientData: any = {
+      patientId,
+      firstName: createPatientDto.firstName,
+      lastName: createPatientDto.lastName,
+      dateOfBirth: new Date(createPatientDto.dateOfBirth),
+      gender: createPatientDto.gender,
+      phoneNumber: createPatientDto.phoneNumber,
+      email: createPatientDto.email,
+      address: createPatientDto.address,
+      emergencyContactName: createPatientDto.emergencyContact.name,
+      emergencyContactRelationship:
+        createPatientDto.emergencyContact.relationship,
+      emergencyContactPhone: createPatientDto.emergencyContact.phoneNumber,
+      bloodGroup: this.mapBloodGroupToEnum(
+        createPatientDto.medicalHistory?.bloodGroup,
+      ),
+      allergies: createPatientDto.medicalHistory?.allergies,
+      genotype: createPatientDto.medicalHistory?.genotype,
+      height: createPatientDto.medicalHistory?.height,
+      insuranceProvider: createPatientDto.insurance?.provider,
+      insurancePolicyNumber: createPatientDto.insurance?.policyNumber,
+      insuranceGroupNumber: createPatientDto.insurance?.groupNumber,
+    };
+
+    // Only add userId if it exists
+    if (userId) {
+      patientData.userId = userId;
+    }
+
     const patient = await this.prisma.patient.create({
-      data: {
-        ...createPatientDto,
-        patientId,
-      },
+      data: patientData,
       include: {
         account: true,
+        user: true,
       },
     });
 
@@ -59,7 +110,14 @@ export class PatientsService {
     return this.findById(patient.id);
   }
 
-  async findAll(query?: { search?: string; isActive?: boolean }) {
+  async findAll(query?: {
+    search?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
     const where: any = {};
 
     if (query?.isActive !== undefined) {
@@ -76,7 +134,32 @@ export class PatientsService {
       ];
     }
 
-    return this.prisma.patient.findMany({
+    // Handle pagination
+    const page = query?.page || 1;
+    const limit = query?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Handle sorting
+    let orderBy: any = { createdAt: 'desc' };
+    if (query?.sortBy) {
+      const validSortFields = [
+        'firstName',
+        'lastName',
+        'patientId',
+        'email',
+        'phoneNumber',
+        'createdAt',
+        'updatedAt',
+      ];
+      if (validSortFields.includes(query.sortBy)) {
+        orderBy = { [query.sortBy]: query.sortOrder || 'asc' };
+      }
+    }
+
+    // Get total count for pagination
+    const total = await this.prisma.patient.count({ where });
+
+    const patients = await this.prisma.patient.findMany({
       where,
       include: {
         account: true,
@@ -97,8 +180,20 @@ export class PatientsService {
           orderBy: { createdAt: 'desc' },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy,
+      skip,
+      take: limit,
     });
+
+    return {
+      data: patients,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findById(id: string) {
@@ -106,6 +201,7 @@ export class PatientsService {
       where: { id },
       include: {
         account: true,
+        user: true,
         consultations: {
           include: {
             doctor: {
@@ -215,6 +311,13 @@ export class PatientsService {
     return patient;
   }
 
+  async findByIdForEdit(id: string) {
+    const patient = await this.findById(id);
+
+    // Transform the database structure to frontend format for editing
+    return this.transformPatientForFrontend(patient);
+  }
+
   async findByPatientId(patientId: string) {
     const patient = await this.prisma.patient.findUnique({
       where: { patientId },
@@ -258,11 +361,45 @@ export class PatientsService {
       }
     }
 
+    // Transform the DTO to match the database structure
+    const updateData: any = { ...updatePatientDto };
+
+    // Handle emergency contact fields
+    if (updatePatientDto.emergencyContact) {
+      updateData.emergencyContactName = updatePatientDto.emergencyContact.name;
+      updateData.emergencyContactRelationship =
+        updatePatientDto.emergencyContact.relationship;
+      updateData.emergencyContactPhone =
+        updatePatientDto.emergencyContact.phoneNumber;
+      delete updateData.emergencyContact;
+    }
+
+    // Handle medical history fields
+    if (updatePatientDto.medicalHistory) {
+      updateData.bloodGroup = this.mapBloodGroupToEnum(
+        updatePatientDto.medicalHistory.bloodGroup,
+      );
+      updateData.allergies = updatePatientDto.medicalHistory.allergies;
+      updateData.genotype = updatePatientDto.medicalHistory.genotype;
+      updateData.height = updatePatientDto.medicalHistory.height;
+      delete updateData.medicalHistory;
+    }
+
+    // Handle insurance fields
+    if (updatePatientDto.insurance) {
+      updateData.insuranceProvider = updatePatientDto.insurance.provider;
+      updateData.insurancePolicyNumber =
+        updatePatientDto.insurance.policyNumber;
+      updateData.insuranceGroupNumber = updatePatientDto.insurance.groupNumber;
+      delete updateData.insurance;
+    }
+
     const patient = await this.prisma.patient.update({
       where: { id },
-      data: updatePatientDto,
+      data: updateData,
       include: {
         account: true,
+        user: true,
       },
     });
 
@@ -290,7 +427,7 @@ export class PatientsService {
   async updateAccountBalance(patientId: string, amount: number) {
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },
-      include: { account: true },
+      include: { account: true, user: true },
     });
 
     if (!patient) {
@@ -957,5 +1094,110 @@ export class PatientsService {
         a.month.localeCompare(b.month),
       ),
     };
+  }
+
+  private generateTempPassword(): string {
+    const chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 12; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  private mapBloodGroupToEnum(frontendValue?: string): any {
+    if (!frontendValue) return undefined;
+
+    const bloodGroupMap: { [key: string]: any } = {
+      'A+': 'A_POSITIVE',
+      'A-': 'A_NEGATIVE',
+      'B+': 'B_POSITIVE',
+      'B-': 'B_NEGATIVE',
+      'AB+': 'AB_POSITIVE',
+      'AB-': 'AB_NEGATIVE',
+      'O+': 'O_POSITIVE',
+      'O-': 'O_NEGATIVE',
+    };
+
+    return bloodGroupMap[frontendValue] || undefined;
+  }
+
+  private transformPatientForFrontend(patient: any) {
+    // Transform the database structure to frontend format for editing
+    return {
+      ...patient,
+      emergencyContact: {
+        name: patient.emergencyContactName || '',
+        relationship: patient.emergencyContactRelationship || '',
+        phoneNumber: patient.emergencyContactPhone || '',
+      },
+      medicalHistory: {
+        allergies: patient.allergies || '',
+        bloodGroup: this.mapBloodGroupToFrontend(patient.bloodGroup),
+        genotype: patient.genotype || '',
+        height: patient.height || '',
+      },
+      insurance: {
+        provider: patient.insuranceProvider || '',
+        policyNumber: patient.insurancePolicyNumber || '',
+        groupNumber: patient.insuranceGroupNumber || '',
+      },
+    };
+  }
+
+  private mapBloodGroupToFrontend(databaseValue?: string): string | undefined {
+    if (!databaseValue) return undefined;
+
+    const bloodGroupMap: { [key: string]: string } = {
+      A_POSITIVE: 'A+',
+      A_NEGATIVE: 'A-',
+      B_POSITIVE: 'B+',
+      B_NEGATIVE: 'B-',
+      AB_POSITIVE: 'AB+',
+      AB_NEGATIVE: 'AB-',
+      O_POSITIVE: 'O+',
+      O_NEGATIVE: 'O-',
+    };
+
+    return bloodGroupMap[databaseValue] || undefined;
+  }
+
+  private async generateUniqueUsername(
+    firstName: string,
+    lastName: string,
+  ): Promise<string> {
+    const baseUsername =
+      `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(
+        /[^a-z0-9.]/g,
+        '',
+      );
+
+    // Check if base username exists
+    let username = baseUsername;
+    let counter = 1;
+
+    while (true) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username },
+      });
+
+      if (!existingUser) {
+        break;
+      }
+
+      // Try with counter suffix
+      username = `${baseUsername}${counter}`;
+      counter++;
+
+      // Prevent infinite loop
+      if (counter > 100) {
+        // Fallback to timestamp-based username
+        username = `${baseUsername}_${Date.now()}`;
+        break;
+      }
+    }
+
+    return username;
   }
 }

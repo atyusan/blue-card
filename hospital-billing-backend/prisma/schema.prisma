@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // output   = "../generated/prisma"  // Commented out to use standard location
 }
 
 datasource db {
@@ -11,7 +10,7 @@ datasource db {
 model User {
   id          String       @id @default(cuid())
   email       String       @unique
-  username    String       @unique
+  username    String?      @unique
   password    String
   firstName   String
   lastName    String
@@ -20,6 +19,7 @@ model User {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   auditLogs   AuditLog[]
+  patient     Patient?
   staffMember StaffMember?
 
   @@map("users")
@@ -44,41 +44,48 @@ model StaffMember {
   pettyCashRequests         PettyCash[]       @relation("PettyCashRequester")
   prescriptions             Prescription[]
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  surgeries                 Surgery[]
   anesthesiologistSurgeries Surgery[]         @relation("Anesthesiologist")
+  surgeries                 Surgery[]
 
   @@map("staff_members")
 }
 
 model Patient {
-  id               String            @id @default(cuid())
-  patientId        String            @unique
-  firstName        String
-  lastName         String
-  dateOfBirth      DateTime
-  gender           Gender
-  phoneNumber      String?
-  email            String?
-  address          String?
-  emergencyContact String?
-  emergencyPhone   String?
-  bloodType        BloodType?
-  allergies        String?
-  medicalHistory   String?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  admissions       Admission[]
-  cashTransactions CashTransaction[]
-  consultations    Consultation[]
-  invoices         Invoice[]
-  labOrders        LabOrder[]
-  account          PatientAccount?
-  payments         Payment[]
-  prescriptions    Prescription[]
-  refunds          Refund[]
-  surgeries        Surgery[]
-  paystackCustomer PaystackCustomer?
+  id                           String            @id @default(cuid())
+  patientId                    String            @unique
+  firstName                    String
+  lastName                     String
+  dateOfBirth                  DateTime
+  gender                       Gender
+  phoneNumber                  String?
+  email                        String?
+  address                      String?
+  allergies                    String?
+  isActive                     Boolean           @default(true)
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+  bloodGroup                   BloodType?
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  genotype                     Genotype?
+  height                       String?
+  insuranceProvider            String?
+  insurancePolicyNumber        String?
+  insuranceGroupNumber         String?
+  userId                       String?           @unique
+  admissions                   Admission[]
+  cashTransactions             CashTransaction[]
+  consultations                Consultation[]
+  invoices                     Invoice[]
+  labOrders                    LabOrder[]
+  account                      PatientAccount?
+  user                         User?             @relation(fields: [userId], references: [id])
+  payments                     Payment[]
+  paystackCustomer             PaystackCustomer?
+  prescriptions                Prescription[]
+  refunds                      Refund[]
+  surgeries                    Surgery[]
 
   @@map("patients")
 }
@@ -122,8 +129,8 @@ model Service {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   charges            Charge[]
-  labTests           LabTest[]
   dailyCharges       DailyCharge[]
+  labTests           LabTest[]
   category           ServiceCategory @relation(fields: [categoryId], references: [id])
 
   @@map("services")
@@ -143,13 +150,13 @@ model Invoice {
   notes             String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  paystackInvoiceId String?
+  paystackReference String?
   charges           Charge[]
   patient           Patient          @relation(fields: [patientId], references: [id])
   payments          Payment[]
-  refunds           Refund[]
   paystackInvoice   PaystackInvoice?
-  paystackInvoiceId String? // Paystack invoice ID
-  paystackReference String? // Paystack request code
+  refunds           Refund[]
 
   @@map("invoices")
 }
@@ -201,19 +208,15 @@ model Consultation {
   treatment        String?
   notes            String?
   isCompleted      Boolean          @default(false)
-
-  // Billing and Payment Fields
-  consultationFee Decimal @default(0) @db.Decimal(10, 2) // Base consultation fee
-  totalAmount     Decimal @default(0) @db.Decimal(10, 2) // Total consultation cost
-  paidAmount      Decimal @default(0) @db.Decimal(10, 2) // Amount paid so far
-  balance         Decimal @default(0) @db.Decimal(10, 2) // Remaining balance
-  isPaid          Boolean @default(false) // Payment status
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  doctor  StaffMember @relation(fields: [doctorId], references: [id])
-  patient Patient     @relation(fields: [patientId], references: [id])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  balance          Decimal          @default(0) @db.Decimal(10, 2)
+  consultationFee  Decimal          @default(0) @db.Decimal(10, 2)
+  isPaid           Boolean          @default(false)
+  paidAmount       Decimal          @default(0) @db.Decimal(10, 2)
+  totalAmount      Decimal          @default(0) @db.Decimal(10, 2)
+  doctor           StaffMember      @relation(fields: [doctorId], references: [id])
+  patient          Patient          @relation(fields: [patientId], references: [id])
 
   @@map("consultations")
 }
@@ -225,12 +228,12 @@ model LabOrder {
   orderDate   DateTime       @default(now())
   status      LabOrderStatus @default(PENDING)
   isPaid      Boolean        @default(false)
-  totalAmount Decimal        @default(0) @db.Decimal(10, 2) // Total cost of all tests
-  paidAmount  Decimal        @default(0) @db.Decimal(10, 2) // Amount paid so far
-  balance     Decimal        @default(0) @db.Decimal(10, 2) // Remaining balance
   notes       String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  balance     Decimal        @default(0) @db.Decimal(10, 2)
+  paidAmount  Decimal        @default(0) @db.Decimal(10, 2)
+  totalAmount Decimal        @default(0) @db.Decimal(10, 2)
   doctor      StaffMember    @relation(fields: [doctorId], references: [id])
   patient     Patient        @relation(fields: [patientId], references: [id])
   tests       LabTest[]
@@ -244,12 +247,12 @@ model LabTest {
   serviceId  String
   result     String?
   status     LabTestStatus @default(PENDING)
-  unitPrice  Decimal       @db.Decimal(10, 2) // Price per test at time of order
-  totalPrice Decimal       @db.Decimal(10, 2) // Total price for this test
-  isPaid     Boolean       @default(false) // Payment status for this specific test
-  notes      String? // Additional notes for the test
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+  isPaid     Boolean       @default(false)
+  notes      String?
+  totalPrice Decimal       @db.Decimal(10, 2)
+  unitPrice  Decimal       @db.Decimal(10, 2)
   order      LabOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   service    Service       @relation(fields: [serviceId], references: [id])
 
@@ -257,111 +260,101 @@ model LabTest {
 }
 
 model Prescription {
-  id               String             @id @default(cuid())
+  id               String                   @id @default(cuid())
   patientId        String
   doctorId         String
-  prescriptionDate DateTime           @default(now())
-  status           PrescriptionStatus @default(PENDING)
-  isPaid           Boolean            @default(false)
-  totalAmount      Decimal            @default(0) @db.Decimal(10, 2) // Total cost of all medications
-  paidAmount       Decimal            @default(0) @db.Decimal(10, 2) // Amount paid so far
-  balance          Decimal            @default(0) @db.Decimal(10, 2) // Remaining balance
+  prescriptionDate DateTime                 @default(now())
+  status           PrescriptionStatus       @default(PENDING)
+  isPaid           Boolean                  @default(false)
   notes            String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-
-  // Relations
-  medications PrescriptionMedication[]
-  doctor      StaffMember              @relation(fields: [doctorId], references: [id])
-  patient     Patient                  @relation(fields: [patientId], references: [id])
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  balance          Decimal                  @default(0) @db.Decimal(10, 2)
+  paidAmount       Decimal                  @default(0) @db.Decimal(10, 2)
+  totalAmount      Decimal                  @default(0) @db.Decimal(10, 2)
+  medications      PrescriptionMedication[]
+  doctor           StaffMember              @relation(fields: [doctorId], references: [id])
+  patient          Patient                  @relation(fields: [patientId], references: [id])
 
   @@map("prescriptions")
 }
 
 model PrescriptionMedication {
-  id             String   @id @default(cuid())
+  id             String                @id @default(cuid())
   prescriptionId String
-  medicationId   String // Changed from serviceId to medicationId
   dosage         String
   frequency      String
   duration       String
-  quantity       Int // Number of units to dispense
   instructions   String?
-  unitPrice      Decimal  @db.Decimal(10, 2) // Price per unit at time of prescription
-  totalPrice     Decimal  @db.Decimal(10, 2) // Total price for this medication
-  isPaid         Boolean  @default(false) // Payment status for this specific medication
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // Relations
-  prescription   Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  medication     Medication            @relation(fields: [medicationId], references: [id])
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  isPaid         Boolean               @default(false)
+  medicationId   String
+  quantity       Int
+  totalPrice     Decimal               @db.Decimal(10, 2)
+  unitPrice      Decimal               @db.Decimal(10, 2)
   dispensedItems DispensedMedication[]
+  medication     Medication            @relation(fields: [medicationId], references: [id])
+  prescription   Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
 
   @@map("prescription_medications")
 }
 
 model Medication {
-  id                   String   @id @default(cuid())
+  id                   String                   @id @default(cuid())
   name                 String
   genericName          String?
   strength             String?
   form                 String?
   manufacturer         String?
-  drugCode             String   @unique // Unique drug identifier
-  category             String? // Antibiotic, Painkiller, etc.
-  controlledDrug       Boolean  @default(false) // Controlled substance flag
-  requiresPrescription Boolean  @default(true)
-  isActive             Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  // Relations
-  inventoryItems    MedicationInventory[]
-  prescriptionItems PrescriptionMedication[]
+  isActive             Boolean                  @default(true)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  category             String?
+  controlledDrug       Boolean                  @default(false)
+  drugCode             String                   @unique
+  requiresPrescription Boolean                  @default(true)
+  inventoryItems       MedicationInventory[]
+  prescriptionItems    PrescriptionMedication[]
 
   @@map("medications")
 }
 
 model MedicationInventory {
-  id                String   @id @default(cuid())
+  id                String                @id @default(cuid())
   medicationId      String
-  batchNumber       String   @unique
+  batchNumber       String                @unique
   expiryDate        DateTime
-  quantity          Int // Total quantity in this batch
-  availableQuantity Int // Available quantity (not reserved)
-  reservedQuantity  Int      @default(0) // Quantity reserved for prescriptions
-  unitCost          Decimal  @db.Decimal(10, 4) // Cost per unit
-  sellingPrice      Decimal  @db.Decimal(10, 2) // Selling price per unit
+  quantity          Int
+  availableQuantity Int
+  reservedQuantity  Int                   @default(0)
+  unitCost          Decimal               @db.Decimal(10, 4)
+  sellingPrice      Decimal               @db.Decimal(10, 2)
   supplier          String?
-  purchaseDate      DateTime @default(now())
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
-  medication     Medication            @relation(fields: [medicationId], references: [id])
-  dispensedItems DispensedMedication[]
+  purchaseDate      DateTime              @default(now())
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  dispensedItems    DispensedMedication[]
+  medication        Medication            @relation(fields: [medicationId], references: [id])
 
   @@map("medication_inventory")
 }
 
 model DispensedMedication {
-  id                       String   @id @default(cuid())
+  id                       String                 @id @default(cuid())
   prescriptionMedicationId String
   inventoryItemId          String
-  quantity                 Int // Quantity dispensed from this batch
-  dispensedBy              String // Staff member ID
-  dispensedAt              DateTime @default(now())
-  batchNumber              String // For tracking
-  expiryDate               DateTime // From inventory
+  quantity                 Int
+  dispensedBy              String
+  dispensedAt              DateTime               @default(now())
+  batchNumber              String
+  expiryDate               DateTime
   notes                    String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-
-  // Relations
-  prescriptionMedication PrescriptionMedication @relation(fields: [prescriptionMedicationId], references: [id])
-  inventoryItem          MedicationInventory    @relation(fields: [inventoryItemId], references: [id])
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  inventoryItem            MedicationInventory    @relation(fields: [inventoryItemId], references: [id])
+  prescriptionMedication   PrescriptionMedication @relation(fields: [prescriptionMedicationId], references: [id])
 
   @@map("dispensed_medications")
 }
@@ -370,7 +363,6 @@ model Admission {
   id            String          @id @default(cuid())
   patientId     String
   doctorId      String
-  wardId        String?
   admissionDate DateTime        @default(now())
   dischargeDate DateTime?
   wardType      WardType
@@ -378,9 +370,10 @@ model Admission {
   status        AdmissionStatus @default(ADMITTED)
   depositAmount Decimal         @db.Decimal(10, 2)
   notes         String?
-  diagnosis     String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  diagnosis     String?
+  wardId        String?
   doctor        StaffMember     @relation(fields: [doctorId], references: [id])
   patient       Patient         @relation(fields: [patientId], references: [id])
   ward          Ward?           @relation(fields: [wardId], references: [id])
@@ -391,18 +384,16 @@ model Admission {
 }
 
 model Ward {
-  id        String   @id @default(cuid())
-  name      String
-  wardType  WardType
-  floor     String?
-  capacity  Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  beds       Bed[]
+  id         String      @id @default(cuid())
+  name       String
+  wardType   WardType
+  floor      String?
+  capacity   Int         @default(0)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
   admissions Admission[]
+  beds       Bed[]
   surgeries  Surgery[]
 
   @@map("wards")
@@ -416,74 +407,59 @@ model Bed {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  // Relations
-  ward Ward @relation(fields: [wardId], references: [id])
+  ward       Ward     @relation(fields: [wardId], references: [id])
 
   @@map("beds")
 }
 
 model DailyCharge {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   admissionId String
   serviceId   String
-  amount      Decimal  @db.Decimal(10, 2)
+  amount      Decimal   @db.Decimal(10, 2)
   description String
-  chargeDate  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  admission Admission @relation(fields: [admissionId], references: [id])
-  service   Service   @relation(fields: [serviceId], references: [id])
+  chargeDate  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  admission   Admission @relation(fields: [admissionId], references: [id])
+  service     Service   @relation(fields: [serviceId], references: [id])
 
   @@map("daily_charges")
 }
 
 model Surgery {
-  id            String        @id @default(cuid())
-  patientId     String
-  surgeonId     String
-  surgeryDate   DateTime
-  surgeryType   String
-  operatingRoom String?
-  duration      Int? // Duration in minutes
-  status        SurgeryStatus @default(SCHEDULED)
-  notes         String?
-
-  // Billing and Cost Fields
-  surgeryFee    Decimal @default(0) @db.Decimal(10, 2) // Base surgery fee
-  anesthesiaFee Decimal @default(0) @db.Decimal(10, 2) // Anesthesia service fee
-  pacuCharges   Decimal @default(0) @db.Decimal(10, 2) // Post-anesthesia care unit charges
-  totalAmount   Decimal @default(0) @db.Decimal(10, 2) // Total surgery cost
-  paidAmount    Decimal @default(0) @db.Decimal(10, 2) // Amount paid so far
-  balance       Decimal @default(0) @db.Decimal(10, 2) // Remaining balance
-
-  // Inpatient Stay Fields
-  requiresInpatient Boolean @default(false) // Whether inpatient stay is required
-  admissionId       String? // Link to admission if inpatient stay required
-  wardId            String? // Ward assignment for inpatient stay
-
-  // Operating Room Booking
-  roomBookingStart  DateTime? // Operating room booking start time
-  roomBookingEnd    DateTime? // Operating room booking end time
-  roomBookingStatus RoomBookingStatus @default(PENDING)
-
-  // Anesthesia Details
-  anesthesiaType     String? // Type of anesthesia used
-  anesthesiologistId String? // Anesthesiologist assigned
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  id                    String                 @id @default(cuid())
+  patientId             String
+  surgeonId             String
+  surgeryDate           DateTime
+  surgeryType           String
+  operatingRoom         String?
+  duration              Int?
+  status                SurgeryStatus          @default(SCHEDULED)
+  notes                 String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  admissionId           String?
+  anesthesiaFee         Decimal                @default(0) @db.Decimal(10, 2)
+  anesthesiaType        String?
+  anesthesiologistId    String?
+  balance               Decimal                @default(0) @db.Decimal(10, 2)
+  pacuCharges           Decimal                @default(0) @db.Decimal(10, 2)
+  paidAmount            Decimal                @default(0) @db.Decimal(10, 2)
+  requiresInpatient     Boolean                @default(false)
+  roomBookingEnd        DateTime?
+  roomBookingStart      DateTime?
+  roomBookingStatus     RoomBookingStatus      @default(PENDING)
+  surgeryFee            Decimal                @default(0) @db.Decimal(10, 2)
+  totalAmount           Decimal                @default(0) @db.Decimal(10, 2)
+  wardId                String?
+  operatingRoomBookings OperatingRoomBooking[]
+  admission             Admission?             @relation(fields: [admissionId], references: [id])
+  anesthesiologist      StaffMember?           @relation("Anesthesiologist", fields: [anesthesiologistId], references: [id])
   patient               Patient                @relation(fields: [patientId], references: [id])
   surgeon               StaffMember            @relation(fields: [surgeonId], references: [id])
-  admission             Admission?             @relation(fields: [admissionId], references: [id])
   ward                  Ward?                  @relation(fields: [wardId], references: [id])
-  anesthesiologist      StaffMember?           @relation("Anesthesiologist", fields: [anesthesiologistId], references: [id])
   surgicalProcedures    SurgicalProcedure[]
-  operatingRoomBookings OperatingRoomBooking[]
 
   @@map("surgeries")
 }
@@ -497,8 +473,7 @@ model SurgicalProcedure {
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  surgery Surgery @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  surgery       Surgery  @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
 
   @@map("surgical_procedures")
 }
@@ -514,8 +489,7 @@ model OperatingRoomBooking {
   notes       String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-
-  surgery Surgery @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  surgery     Surgery           @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
 
   @@map("operating_room_bookings")
 }
@@ -602,24 +576,20 @@ model Refund {
   @@map("refunds")
 }
 
-// ===== PAYSTACK INTEGRATION =====
-
 model PaystackCustomer {
-  id                 String   @id @default(cuid())
-  patientId          String   @unique
-  paystackCustomerId String   @unique // Paystack's customer ID
-  customerCode       String   @unique // Paystack's customer code
+  id                 String            @id @default(cuid())
+  patientId          String            @unique
+  paystackCustomerId String            @unique
+  customerCode       String            @unique
   email              String
   firstName          String?
   lastName           String?
   phone              String?
-  metadata           Json? // Additional Paystack data
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  // Relations
-  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  paystackInvoices PaystackInvoice[]
+  metadata           Json?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  patient            Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  paystackInvoices   PaystackInvoice[]
 
   @@map("paystack_customers")
 }
@@ -627,10 +597,10 @@ model PaystackCustomer {
 model PaystackInvoice {
   id                 String                @id @default(cuid())
   localInvoiceId     String                @unique
-  paystackCustomerId String // Add this field for the relation
-  paystackInvoiceId  String                @unique // Paystack's invoice ID
-  requestCode        String                @unique // Paystack's request code
-  offlineReference   String? // Paystack's offline reference
+  paystackCustomerId String
+  paystackInvoiceId  String                @unique
+  requestCode        String                @unique
+  offlineReference   String?
   status             PaystackInvoiceStatus @default(PENDING)
   amount             Decimal               @db.Decimal(10, 2)
   currency           String                @default("NGN")
@@ -639,17 +609,15 @@ model PaystackInvoice {
   hasInvoice         Boolean               @default(false)
   invoiceNumber      String?
   pdfUrl             String?
-  lineItems          Json? // Paystack line items
-  tax                Json? // Paystack tax information
-  discount           Json? // Paystack discount information
-  metadata           Json? // Additional Paystack data
+  lineItems          Json?
+  tax                Json?
+  discount           Json?
+  metadata           Json?
   paidAt             DateTime?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
-
-  // Relations
-  localInvoice     Invoice          @relation(fields: [localInvoiceId], references: [id], onDelete: Cascade)
-  paystackCustomer PaystackCustomer @relation(fields: [paystackCustomerId], references: [id])
+  localInvoice       Invoice               @relation(fields: [localInvoiceId], references: [id], onDelete: Cascade)
+  paystackCustomer   PaystackCustomer      @relation(fields: [paystackCustomerId], references: [id])
 
   @@map("paystack_invoices")
 }
@@ -670,6 +638,7 @@ enum UserRole {
   CASHIER
   RECEPTIONIST
   ACCOUNTANT
+  PATIENT
 }
 
 enum Gender {
@@ -687,6 +656,15 @@ enum BloodType {
   AB_NEGATIVE
   O_POSITIVE
   O_NEGATIVE
+}
+
+enum Genotype {
+  AA
+  AS
+  AC
+  SS
+  SC
+  CC
 }
 
 enum InvoiceStatus {

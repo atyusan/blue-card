@@ -7,10 +7,33 @@ import {
   PrescriptionStatus,
   TransactionType,
   BloodType,
+  Genotype,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+function generateTempPassword(): string {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 12; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function generateUniqueUsername(firstName: string, lastName: string): string {
+  const baseUsername =
+    `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(
+      /[^a-z0-9.]/g,
+      '',
+    );
+
+  // For seeding, we'll use a simple approach with timestamp to ensure uniqueness
+  const timestamp = Date.now().toString().slice(-6);
+  return `${baseUsername}_${timestamp}`;
+}
 
 async function main() {
   console.log('🌱 Starting database seeding...');
@@ -183,6 +206,7 @@ async function seedPatientAccounts() {
   const patients = await prisma.patient.findMany();
 
   for (const patient of patients) {
+    // Create patient account
     await prisma.patientAccount.create({
       data: {
         patientId: patient.id,
@@ -191,6 +215,37 @@ async function seedPatientAccounts() {
         creditLimit: 5000,
       },
     });
+
+    // Create user account for patients with emails
+    if (patient.email) {
+      const username = generateUniqueUsername(
+        patient.firstName,
+        patient.lastName,
+      );
+      const tempPassword = generateTempPassword();
+
+      const user = await prisma.user.create({
+        data: {
+          email: patient.email,
+          username,
+          password: await bcrypt.hash(tempPassword, 10),
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          role: UserRole.PATIENT,
+          isActive: true,
+        },
+      });
+
+      // Link patient to user
+      await prisma.patient.update({
+        where: { id: patient.id },
+        data: { userId: user.id },
+      });
+
+      console.log(
+        `👤 Created user account for patient ${patient.patientId} with temporary password: ${tempPassword}`,
+      );
+    }
   }
 
   console.log(`✅ Created ${patients.length} patient accounts`);
@@ -922,11 +977,13 @@ async function seedPatients() {
       phoneNumber: '+1234567890',
       email: 'alice.johnson@email.com',
       address: '123 Main St, City, State 12345',
-      emergencyContact: 'Bob Johnson',
-      emergencyPhone: '+1234567891',
-      bloodType: BloodType.A_POSITIVE,
+      emergencyContactName: 'Bob Johnson',
+      emergencyContactRelationship: 'Husband',
+      emergencyContactPhone: '+1234567891',
+      bloodGroup: BloodType.A_POSITIVE,
       allergies: 'Penicillin',
-      medicalHistory: 'Hypertension, Diabetes Type 2',
+      genotype: Genotype.AA,
+      height: '5\'6"',
     },
     {
       patientId: 'P002',
@@ -937,11 +994,13 @@ async function seedPatients() {
       phoneNumber: '+1234567892',
       email: 'bob.williams@email.com',
       address: '456 Oak Ave, City, State 12345',
-      emergencyContact: 'Mary Williams',
-      emergencyPhone: '+1234567893',
-      bloodType: BloodType.O_POSITIVE,
+      emergencyContactName: 'Mary Williams',
+      emergencyContactRelationship: 'Wife',
+      emergencyContactPhone: '+1234567893',
+      bloodGroup: BloodType.O_POSITIVE,
       allergies: 'None',
-      medicalHistory: 'Asthma',
+      genotype: Genotype.AA,
+      height: '6\'0"',
     },
     {
       patientId: 'P003',
@@ -952,11 +1011,13 @@ async function seedPatients() {
       phoneNumber: '+1234567894',
       email: 'carol.davis@email.com',
       address: '789 Pine Rd, City, State 12345',
-      emergencyContact: 'Tom Davis',
-      emergencyPhone: '+1234567895',
-      bloodType: BloodType.B_NEGATIVE,
+      emergencyContactName: 'Tom Davis',
+      emergencyContactRelationship: 'Father',
+      emergencyContactPhone: '+1234567895',
+      bloodGroup: BloodType.B_NEGATIVE,
       allergies: 'Latex, Shellfish',
-      medicalHistory: 'Migraine',
+      genotype: Genotype.AS,
+      height: '5\'4"',
     },
     {
       patientId: 'P004',
@@ -967,11 +1028,13 @@ async function seedPatients() {
       phoneNumber: '+1234567896',
       email: 'david.miller@email.com',
       address: '321 Elm St, City, State 12345',
-      emergencyContact: 'Jane Miller',
-      emergencyPhone: '+1234567897',
-      bloodType: BloodType.AB_POSITIVE,
+      emergencyContactName: 'Jane Miller',
+      emergencyContactRelationship: 'Wife',
+      emergencyContactPhone: '+1234567897',
+      bloodGroup: BloodType.AB_POSITIVE,
       allergies: 'Sulfa drugs',
-      medicalHistory: 'Heart disease, High cholesterol',
+      genotype: Genotype.AA,
+      height: '5\'10"',
     },
     {
       patientId: 'P005',
@@ -982,11 +1045,47 @@ async function seedPatients() {
       phoneNumber: '+1234567898',
       email: 'eva.garcia@email.com',
       address: '654 Maple Dr, City, State 12345',
-      emergencyContact: 'Carlos Garcia',
-      emergencyPhone: '+1234567899',
-      bloodType: BloodType.O_NEGATIVE,
+      emergencyContactName: 'Carlos Garcia',
+      emergencyContactRelationship: 'Brother',
+      emergencyContactPhone: '+1234567899',
+      bloodGroup: BloodType.O_NEGATIVE,
       allergies: 'None',
-      medicalHistory: 'Depression, Anxiety',
+      genotype: Genotype.AA,
+      height: '5\'7"',
+    },
+    {
+      patientId: 'P006',
+      firstName: 'Michael',
+      lastName: 'Chen',
+      dateOfBirth: new Date('1990-08-14'),
+      gender: Gender.MALE,
+      phoneNumber: '+1234567800',
+      email: 'michael.chen@email.com',
+      address: '987 Cedar Ln, City, State 12345',
+      emergencyContactName: 'Sarah Chen',
+      emergencyContactRelationship: 'Sister',
+      emergencyContactPhone: '+1234567801',
+      bloodGroup: BloodType.B_POSITIVE,
+      allergies: 'Peanuts',
+      genotype: Genotype.AS,
+      height: '5\'11"',
+    },
+    {
+      patientId: 'P007',
+      firstName: 'Lisa',
+      lastName: 'Thompson',
+      dateOfBirth: new Date('1983-04-25'),
+      gender: Gender.FEMALE,
+      phoneNumber: '+1234567802',
+      email: 'lisa.thompson@email.com',
+      address: '147 Birch St, City, State 12345',
+      emergencyContactName: 'John Thompson',
+      emergencyContactRelationship: 'Husband',
+      emergencyContactPhone: '+1234567803',
+      bloodGroup: BloodType.A_NEGATIVE,
+      allergies: 'Dairy',
+      genotype: Genotype.AA,
+      height: '5\'5"',
     },
   ];
 

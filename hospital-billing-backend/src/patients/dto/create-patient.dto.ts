@@ -6,7 +6,10 @@ import {
   IsOptional,
   IsDateString,
   IsEnum,
+  ValidateNested,
+  IsObject,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum Gender {
   MALE = 'MALE',
@@ -15,14 +18,118 @@ export enum Gender {
 }
 
 export enum BloodType {
-  A_POSITIVE = 'A_POSITIVE',
-  A_NEGATIVE = 'A_NEGATIVE',
-  B_POSITIVE = 'B_POSITIVE',
-  B_NEGATIVE = 'B_NEGATIVE',
-  AB_POSITIVE = 'AB_POSITIVE',
-  AB_NEGATIVE = 'AB_NEGATIVE',
-  O_POSITIVE = 'O_POSITIVE',
-  O_NEGATIVE = 'O_NEGATIVE',
+  A_POSITIVE = 'A+',
+  A_NEGATIVE = 'A-',
+  B_POSITIVE = 'B+',
+  B_NEGATIVE = 'B-',
+  AB_POSITIVE = 'AB+',
+  AB_NEGATIVE = 'AB-',
+  O_POSITIVE = 'O+',
+  O_NEGATIVE = 'O-',
+}
+
+export enum Genotype {
+  AA = 'AA',
+  AS = 'AS',
+  AC = 'AC',
+  SS = 'SS',
+  SC = 'SC',
+  CC = 'CC',
+}
+
+export class EmergencyContactDto {
+  @ApiProperty({
+    description: 'Emergency contact name',
+    example: 'Jane Doe',
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({
+    description: 'Emergency contact relationship',
+    example: 'Wife',
+  })
+  @IsString()
+  @IsNotEmpty()
+  relationship: string;
+
+  @ApiProperty({
+    description: 'Emergency contact phone number',
+    example: '+1234567890',
+  })
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
+}
+
+export class MedicalHistoryDto {
+  @ApiProperty({
+    description: 'Patient allergies',
+    example: 'Penicillin, Peanuts',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  allergies?: string;
+
+  @ApiProperty({
+    description: 'Patient blood group',
+    enum: BloodType,
+    example: BloodType.B_NEGATIVE,
+    required: false,
+  })
+  @IsEnum(BloodType)
+  @IsOptional()
+  bloodGroup?: BloodType;
+
+  @ApiProperty({
+    description: 'Patient genotype',
+    enum: Genotype,
+    example: Genotype.AC,
+    required: false,
+  })
+  @IsEnum(Genotype)
+  @IsOptional()
+  genotype?: Genotype;
+
+  @ApiProperty({
+    description: 'Patient height',
+    example: '6\'1"',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  height?: string;
+}
+
+export class InsuranceDto {
+  @ApiProperty({
+    description: 'Insurance provider',
+    example: 'Blue Cross',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  provider?: string;
+
+  @ApiProperty({
+    description: 'Insurance policy number',
+    example: 'POL123456',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  policyNumber?: string;
+
+  @ApiProperty({
+    description: 'Insurance group number',
+    example: 'GRP789',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  groupNumber?: string;
 }
 
 export class CreatePatientDto {
@@ -87,48 +194,33 @@ export class CreatePatientDto {
   address?: string;
 
   @ApiProperty({
-    description: 'Emergency contact name',
-    example: 'Jane Doe',
-    required: false,
+    description: 'Emergency contact information',
+    type: EmergencyContactDto,
   })
-  @IsString()
-  @IsOptional()
-  emergencyContact?: string;
+  @ValidateNested()
+  @Type(() => EmergencyContactDto)
+  @IsObject()
+  emergencyContact: EmergencyContactDto;
 
   @ApiProperty({
-    description: 'Emergency contact phone number',
-    example: '+1234567890',
+    description: 'Medical history information',
+    type: MedicalHistoryDto,
     required: false,
   })
-  @IsString()
+  @ValidateNested()
+  @Type(() => MedicalHistoryDto)
+  @IsObject()
   @IsOptional()
-  emergencyPhone?: string;
+  medicalHistory?: MedicalHistoryDto;
 
   @ApiProperty({
-    description: 'Patient blood type',
-    enum: BloodType,
-    example: BloodType.O_POSITIVE,
+    description: 'Insurance information',
+    type: InsuranceDto,
     required: false,
   })
-  @IsEnum(BloodType)
+  @ValidateNested()
+  @Type(() => InsuranceDto)
+  @IsObject()
   @IsOptional()
-  bloodType?: BloodType;
-
-  @ApiProperty({
-    description: 'Patient allergies',
-    example: 'Penicillin, Peanuts',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  allergies?: string;
-
-  @ApiProperty({
-    description: 'Patient medical history',
-    example: 'Diabetes Type 2, Hypertension',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  medicalHistory?: string;
+  insurance?: InsuranceDto;
 }

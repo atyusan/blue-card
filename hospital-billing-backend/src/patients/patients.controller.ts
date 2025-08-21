@@ -59,11 +59,46 @@ export class PatientsController {
     required: false,
     description: 'Filter by active status',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Field to sort by',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Sort order (asc or desc)',
+    enum: ['asc', 'desc'],
+  })
   findAll(
     @Query('search') search?: string,
-    @Query('isActive', ParseBoolPipe) isActive?: boolean,
+    @Query('isActive', new ParseBoolPipe({ optional: true }))
+    isActive?: boolean,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    return this.patientsService.findAll({ search, isActive });
+    return this.patientsService.findAll({
+      search,
+      isActive,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Get(':id')
@@ -78,6 +113,20 @@ export class PatientsController {
   })
   findOne(@Param('id') id: string) {
     return this.patientsService.findById(id);
+  }
+
+  @Get(':id/edit')
+  @ApiOperation({ summary: 'Get patient data for editing (frontend format)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Patient data in frontend format for editing',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Patient not found',
+  })
+  findOneForEdit(@Param('id') id: string) {
+    return this.patientsService.findByIdForEdit(id);
   }
 
   @Get('by-patient-id/:patientId')
