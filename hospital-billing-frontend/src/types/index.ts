@@ -77,13 +77,12 @@ export interface Service {
   id: string;
   name: string;
   description?: string;
-  category: string;
-  price: number;
-  duration?: number;
-  code?: string;
-  currency?: string;
-  active?: boolean;
+  category: string | { id: string; name: string };
+  basePrice: number;
+  currentPrice: number;
+  serviceCode?: string;
   isActive?: boolean;
+  requiresPrePayment?: boolean;
   createdAt: string;
   updatedAt: string;
 }

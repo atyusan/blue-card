@@ -28,9 +28,17 @@ export class BillingService {
     private readonly paystackService: PaystackService,
   ) {}
 
+  // Helper function to convert unitPrice to number
+  private parseUnitPrice(unitPrice: string | number): number {
+    return typeof unitPrice === 'string' ? parseFloat(unitPrice) : unitPrice;
+  }
+
   // Invoice Management
   async createInvoice(createInvoiceDto: CreateInvoiceDto) {
-    const { patientId, charges, ...invoiceData } = createInvoiceDto;
+    const { patientId, items, charges, ...invoiceData } = createInvoiceDto;
+
+    // Use items if provided, otherwise fall back to charges for backward compatibility
+    const invoiceItems = items || charges || [];
 
     // Check if patient exists
     const patient = await this.prisma.patient.findUnique({
@@ -45,21 +53,23 @@ export class BillingService {
     // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber();
 
-    // Calculate total amount from charges
+    // Calculate total amount from invoice items
     let totalAmount = 0;
-    if (charges && charges.length > 0) {
-      for (const charge of charges) {
+    if (invoiceItems && invoiceItems.length > 0) {
+      for (const item of invoiceItems) {
         const service = await this.prisma.service.findUnique({
-          where: { id: charge.serviceId },
+          where: { id: item.serviceId },
         });
 
         if (!service) {
           throw new NotFoundException(
-            `Service with ID ${charge.serviceId} not found`,
+            `Service with ID ${item.serviceId} not found`,
           );
         }
 
-        totalAmount += Number(service.currentPrice) * charge.quantity;
+        // Handle both string and number unitPrice
+        const unitPrice = this.parseUnitPrice(item.unitPrice);
+        totalAmount += Number(service.currentPrice) * item.quantity;
       }
     }
 
@@ -73,12 +83,12 @@ export class BillingService {
         balance: totalAmount,
         charges: {
           create:
-            charges?.map((charge) => ({
-              serviceId: charge.serviceId,
-              description: charge.description,
-              quantity: charge.quantity,
-              unitPrice: charge.unitPrice,
-              totalPrice: charge.unitPrice * charge.quantity,
+            invoiceItems?.map((item) => ({
+              serviceId: item.serviceId,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: this.parseUnitPrice(item.unitPrice),
+              totalPrice: this.parseUnitPrice(item.unitPrice) * item.quantity,
             })) || [],
         },
       },

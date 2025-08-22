@@ -25,6 +25,8 @@ import PatientDetailsPage from './pages/PatientDetailsPage';
 import BillingPage from './pages/BillingPage';
 import InvoiceDetailsPage from './pages/InvoiceDetailsPage';
 import InvoiceEditPage from './pages/InvoiceEditPage';
+import CreateInvoicePage from './pages/CreateInvoicePage';
+import BillingSettingsPage from './pages/BillingSettingsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import Layout from './components/layout/Layout';
 
@@ -114,6 +116,14 @@ function App() {
 
                   {/* Billing & Invoices Routes */}
                   <Route path='billing' element={<BillingPage />} />
+                  <Route
+                    path='billing/create'
+                    element={<CreateInvoicePage />}
+                  />
+                  <Route
+                    path='billing/settings'
+                    element={<BillingSettingsPage />}
+                  />
                   <Route path='billing/:id' element={<InvoiceDetailsPage />} />
                   <Route
                     path='billing/:id/edit'

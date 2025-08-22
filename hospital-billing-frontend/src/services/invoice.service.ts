@@ -83,6 +83,31 @@ class InvoiceService {
     return response;
   }
 
+  // Add charge to invoice
+  async addChargeToInvoice(
+    invoiceId: string,
+    chargeData: {
+      serviceId: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+    }
+  ): Promise<Invoice> {
+    const response = await http.post<Invoice>(
+      `/billing/invoices/${invoiceId}/charges`,
+      chargeData
+    );
+    return response;
+  }
+
+  // Remove charge from invoice
+  async removeChargeFromInvoice(
+    invoiceId: string,
+    chargeId: string
+  ): Promise<void> {
+    await http.delete(`/billing/invoices/${invoiceId}/charges/${chargeId}`);
+  }
+
   // Delete invoice
   async deleteInvoice(id: string): Promise<void> {
     await http.delete(`/billing/invoices/${id}`);

@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  Request,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -305,11 +306,18 @@ export class BillingController {
       amount: number;
       method: string;
       reference?: string;
-      processedBy: string;
       notes?: string;
     },
+    @Request() req: any,
   ) {
-    return this.billingService.processPayment(invoiceId, paymentData);
+    // Get the authenticated user from the JWT token
+    const user = req.user;
+    const processedBy = user?.id || user?.sub || 'system';
+
+    return this.billingService.processPayment(invoiceId, {
+      ...paymentData,
+      processedBy,
+    });
   }
 
   @Get('invoices/:id/payment-status')
@@ -364,11 +372,18 @@ export class BillingController {
     refundData: {
       amount: number;
       reason: string;
-      processedBy: string;
       notes?: string;
     },
+    @Request() req: any,
   ) {
-    return this.billingService.processRefund(paymentId, refundData);
+    // Get the authenticated user from the JWT token
+    const user = req.user;
+    const processedBy = user?.id || user?.sub || 'system';
+
+    return this.billingService.processRefund(paymentId, {
+      ...refundData,
+      processedBy,
+    });
   }
 
   @Get('analytics')

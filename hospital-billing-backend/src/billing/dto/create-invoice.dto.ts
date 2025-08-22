@@ -58,7 +58,18 @@ export class CreateInvoiceDto {
   notes?: string;
 
   @ApiProperty({
-    description: 'Array of charges for the invoice',
+    description: 'Array of invoice items (will be mapped to charges)',
+    type: [CreateChargeDto],
+    required: false,
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateChargeDto)
+  @IsOptional()
+  items?: CreateChargeDto[];
+
+  @ApiProperty({
+    description: 'Array of charges for the invoice (legacy field)',
     type: [CreateChargeDto],
     required: false,
   })

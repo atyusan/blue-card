@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogTitle,
   Tooltip,
+  Autocomplete,
 } from '@mui/material';
 import { Save, Cancel, Add, Delete, Edit } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +33,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
 import { invoiceService } from '../services/invoice.service';
+import { serviceService } from '../services/service.service';
 import { formatDate, formatCurrency } from '../utils';
 import toast from 'react-hot-toast';
 import type { Invoice, Service } from '../types';
@@ -51,8 +53,6 @@ interface EditInvoiceFormData {
   dueDate: Date | null;
   notes: string;
   items: InvoiceItem[];
-  taxAmount: number;
-  discountAmount: number;
 }
 
 const InvoiceEditPage: React.FC = () => {
@@ -66,8 +66,6 @@ const InvoiceEditPage: React.FC = () => {
     dueDate: null,
     notes: '',
     items: [],
-    taxAmount: 0,
-    discountAmount: 0,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -92,6 +90,21 @@ const InvoiceEditPage: React.FC = () => {
     retry: 1,
   });
 
+  // Fetch services for selection
+  const { data: servicesData, isLoading: servicesLoading } = useQuery<
+    Service[]
+  >({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const response = await serviceService.getServices({ active: true });
+      // Handle both paginated and direct array responses
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data;
+      }
+      return response as Service[];
+    },
+  });
+
   // Update invoice mutation
   const updateInvoiceMutation = useMutation({
     mutationFn: (updateData: any) =>
@@ -99,8 +112,7 @@ const InvoiceEditPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice', id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success('Invoice updated successfully');
-      navigate(`/billing/${id}`);
+      // Don't navigate here - let the handleSave function handle it
     },
     onError: (error) => {
       console.error('Update invoice error:', error);
@@ -125,40 +137,113 @@ const InvoiceEditPage: React.FC = () => {
             unitPrice: Number(charge.unitPrice),
             totalPrice: Number(charge.totalPrice),
           })) || [],
-        taxAmount: Number(invoice.taxAmount) || 0,
-        discountAmount: Number(invoice.discountAmount) || 0,
       });
     }
   }, [invoice]);
 
-  // Calculate totals
+  // Calculate totals (frontend display only - backend recalculates)
   const subtotal = formData.items.reduce(
     (sum, item) => sum + item.totalPrice,
     0
   );
-  const totalAfterTax = subtotal + formData.taxAmount;
-  const finalTotal = totalAfterTax - formData.discountAmount;
 
   // Event handlers
   const handleBack = () => {
     navigate(`/billing/${id}`);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (formData.items.length === 0) {
       toast.error('Invoice must have at least one item');
       return;
     }
 
-    const updateData = {
-      dueDate: formData.dueDate?.toISOString(),
-      notes: formData.notes,
-      taxAmount: formData.taxAmount,
-      discountAmount: formData.discountAmount,
-      totalAmount: finalTotal,
-    };
+    try {
+      // First, update the basic invoice fields (only allowed fields)
+      const updateData = {
+        dueDate: formData.dueDate?.toISOString(),
+        notes: formData.notes,
+        status: invoice?.status, // Keep current status
+      };
 
-    updateInvoiceMutation.mutate(updateData);
+      console.log('🔄 Updating basic invoice fields:', updateData);
+      await updateInvoiceMutation.mutateAsync(updateData);
+      console.log('✅ Basic invoice update completed');
+
+      // Now handle the charges - we need to compare with original invoice
+      if (invoice) {
+        const originalCharges = invoice.charges || [];
+        const currentItems = formData.items;
+
+        console.log('🔍 Analyzing charges:', {
+          originalChargesCount: originalCharges.length,
+          currentItemsCount: currentItems.length,
+          originalCharges,
+          currentItems,
+        });
+
+        // Remove charges that are no longer in the current items
+        for (const charge of originalCharges) {
+          const stillExists = currentItems.some(
+            (item) => item.id === charge.id
+          );
+          if (!stillExists) {
+            console.log('🗑️ Removing charge:', charge.id);
+            await invoiceService.removeChargeFromInvoice(id!, charge.id);
+            console.log('✅ Charge removed successfully');
+          }
+        }
+
+        // Add new charges or update existing ones
+        for (const item of currentItems) {
+          if (item.id) {
+            // This is an existing charge - update it if needed
+            const originalCharge = originalCharges.find(
+              (c) => c.id === item.id
+            );
+            if (originalCharge) {
+              const hasChanged =
+                originalCharge.description !== item.description ||
+                originalCharge.quantity !== item.quantity ||
+                Number(originalCharge.unitPrice) !== item.unitPrice;
+
+              if (hasChanged) {
+                console.log('✏️ Updating charge:', item.id, { hasChanged });
+                // Remove old charge and add new one
+                await invoiceService.removeChargeFromInvoice(id!, item.id);
+                await invoiceService.addChargeToInvoice(id!, {
+                  serviceId: item.serviceId,
+                  description: item.description,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                });
+                console.log('✅ Charge updated successfully');
+              }
+            }
+          } else {
+            console.log('➕ Adding new charge:', item);
+            // This is a new item - add it
+            await invoiceService.addChargeToInvoice(id!, {
+              serviceId: item.serviceId,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            });
+            console.log('✅ New charge added successfully');
+          }
+        }
+      }
+
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+
+      toast.success('Invoice updated successfully');
+      navigate(`/billing/${id}`);
+    } catch (error) {
+      console.error('Update invoice error:', error);
+      toast.error('Failed to update invoice');
+    }
   };
 
   const handleCancel = () => {
@@ -191,11 +276,12 @@ const InvoiceEditPage: React.FC = () => {
 
   const handleSaveItem = () => {
     if (
+      !editingItem.serviceId ||
       !editingItem.description ||
       editingItem.quantity <= 0 ||
       editingItem.unitPrice <= 0
     ) {
-      toast.error('Please fill in all required fields');
+      toast.error('Please select a service and fill in all required fields');
       return;
     }
 
@@ -221,6 +307,18 @@ const InvoiceEditPage: React.FC = () => {
       unitPrice: 0,
       totalPrice: 0,
     });
+  };
+
+  const handleServiceChange = (service: Service | null) => {
+    if (service) {
+      setEditingItem({
+        ...editingItem,
+        serviceId: service.id,
+        description: service.name,
+        unitPrice: service.currentPrice,
+        totalPrice: service.currentPrice * editingItem.quantity,
+      });
+    }
   };
 
   const handleCancelEdit = () => {
@@ -495,51 +593,19 @@ const InvoiceEditPage: React.FC = () => {
                   sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}
                 >
                   <Box sx={{ minWidth: 300 }}>
-                    <Box display='flex' justifyContent='space-between' mb={1}>
-                      <Typography variant='body2'>Subtotal:</Typography>
-                      <Typography variant='body2'>
+                    <Box display='flex' justifyContent='space-between'>
+                      <Typography variant='h6'>Subtotal:</Typography>
+                      <Typography variant='h6'>
                         {formatCurrency(subtotal)}
                       </Typography>
                     </Box>
-                    <Box display='flex' justifyContent='space-between' mb={1}>
-                      <Typography variant='body2'>Tax:</Typography>
-                      <TextField
-                        type='number'
-                        value={formData.taxAmount}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            taxAmount: Number(e.target.value) || 0,
-                          })
-                        }
-                        size='small'
-                        sx={{ width: 100 }}
-                        inputProps={{ min: 0, step: 0.01 }}
-                      />
-                    </Box>
-                    <Box display='flex' justifyContent='space-between' mb={1}>
-                      <Typography variant='body2'>Discount:</Typography>
-                      <TextField
-                        type='number'
-                        value={formData.discountAmount}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            discountAmount: Number(e.target.value) || 0,
-                          })
-                        }
-                        size='small'
-                        sx={{ width: 100 }}
-                        inputProps={{ min: 0, step: 0.01 }}
-                      />
-                    </Box>
-                    <Divider sx={{ my: 1 }} />
-                    <Box display='flex' justifyContent='space-between'>
-                      <Typography variant='h6'>Total:</Typography>
-                      <Typography variant='h6'>
-                        {formatCurrency(finalTotal)}
-                      </Typography>
-                    </Box>
+                    <Typography
+                      variant='caption'
+                      color='text.secondary'
+                      sx={{ mt: 1, display: 'block', textAlign: 'right' }}
+                    >
+                      *Final total will be calculated by the system
+                    </Typography>
                   </Box>
                 </Box>
               </Box>
@@ -593,27 +659,13 @@ const InvoiceEditPage: React.FC = () => {
                       {formatCurrency(subtotal)}
                     </Typography>
                   </Box>
-                  <Box display='flex' justifyContent='space-between' mb={1}>
-                    <Typography variant='body2'>Tax:</Typography>
-                    <Typography variant='body2'>
-                      {formatCurrency(formData.taxAmount)}
-                    </Typography>
-                  </Box>
-                  <Box display='flex' justifyContent='space-between' mb={1}>
-                    <Typography variant='body2'>Discount:</Typography>
-                    <Typography variant='body2'>
-                      {formatCurrency(formData.discountAmount)}
-                    </Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box display='flex' justifyContent='space-between'>
-                    <Typography variant='body1' fontWeight={500}>
-                      Final Total:
-                    </Typography>
-                    <Typography variant='body1' fontWeight={500}>
-                      {formatCurrency(finalTotal)}
-                    </Typography>
-                  </Box>
+                  <Typography
+                    variant='caption'
+                    color='text.secondary'
+                    sx={{ display: 'block', textAlign: 'center', mt: 1 }}
+                  >
+                    Final total calculated by system
+                  </Typography>
                 </Box>
               </Box>
             </Card>
@@ -632,6 +684,36 @@ const InvoiceEditPage: React.FC = () => {
           </DialogTitle>
           <DialogContent>
             <Stack spacing={3} sx={{ mt: 2 }}>
+              <Autocomplete
+                options={servicesData || []}
+                getOptionLabel={(option) => option.name}
+                value={
+                  servicesData?.find((s) => s.id === editingItem.serviceId) ||
+                  null
+                }
+                onChange={(_, newValue) => handleServiceChange(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} label='Service' required />
+                )}
+                fullWidth
+                noOptionsText={
+                  servicesLoading ? 'Loading services...' : 'No services found'
+                }
+                loading={servicesLoading}
+                renderOption={(props, option) => (
+                  <li {...props}>
+                    <div>
+                      <div>{option.name}</div>
+                      <div style={{ fontSize: '0.8em', color: 'gray' }}>
+                        ${option.currentPrice} -{' '}
+                        {typeof option.category === 'string'
+                          ? option.category
+                          : option.category?.name}
+                      </div>
+                    </div>
+                  </li>
+                )}
+              />
               <TextField
                 label='Description'
                 value={editingItem.description}
