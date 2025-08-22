@@ -149,13 +149,18 @@ export interface Invoice {
   taxAmount?: number;
   discountAmount?: number;
   totalAmount: number;
+  paidAmount?: number;
+  balance?: number;
   currency?: string;
   status: string;
   dueDate: string;
+  issuedDate?: string;
   paidAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  charges?: any[];
+  payments?: any[];
 }
 
 export interface InvoiceItem {

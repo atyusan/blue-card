@@ -23,6 +23,7 @@ import PatientsPage from './pages/PatientsPage';
 import AddPatientPage from './pages/AddPatientPage';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import BillingPage from './pages/BillingPage';
+import InvoiceDetailsPage from './pages/InvoiceDetailsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import Layout from './components/layout/Layout';
 
@@ -112,6 +113,11 @@ function App() {
 
                   {/* Billing & Invoices Routes */}
                   <Route path='billing' element={<BillingPage />} />
+                  <Route path='billing/:id' element={<InvoiceDetailsPage />} />
+                  <Route
+                    path='billing/:id/edit'
+                    element={<div>Invoice Edit Page</div>}
+                  />
 
                   {/* Appointments Routes */}
                   <Route path='appointments' element={<AppointmentsPage />} />

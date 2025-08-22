@@ -88,7 +88,51 @@ const BillingPage: React.FC = () => {
     queryKey: ['invoices', queryParams],
     queryFn: () => invoiceService.getInvoices(queryParams),
     placeholderData: (previousData) => previousData,
+    retry: 1,
+    retryDelay: 1000,
   });
+
+  // Fix data extraction - handle different possible response structures
+  const invoices = useMemo(() => {
+    if (!invoicesData) return [];
+
+    // If invoicesData is already an array, use it directly
+    if (Array.isArray(invoicesData)) {
+      return invoicesData;
+    }
+
+    // If invoicesData has a data property that's an array, use that
+    if (invoicesData.data && Array.isArray(invoicesData.data)) {
+      return invoicesData.data;
+    }
+
+    // Fallback: return empty array
+    return [];
+  }, [invoicesData]);
+
+  const totalCount = useMemo(() => {
+    if (!invoicesData) return 0;
+
+    // If invoicesData has pagination info
+    if (
+      invoicesData.pagination &&
+      typeof invoicesData.pagination.total === 'number'
+    ) {
+      return invoicesData.pagination.total;
+    }
+
+    // If invoicesData is an array, return its length
+    if (Array.isArray(invoicesData)) {
+      return invoicesData.length;
+    }
+
+    // If invoicesData has a data property that's an array
+    if (invoicesData.data && Array.isArray(invoicesData.data)) {
+      return invoicesData.data.length;
+    }
+
+    return 0;
+  }, [invoicesData]);
 
   // Delete invoice mutation
   const deleteInvoiceMutation = useMutation({
@@ -168,7 +212,7 @@ const BillingPage: React.FC = () => {
     try {
       await refetch();
       toast.success('Invoice list refreshed');
-    } catch (error) {
+    } catch {
       toast.error('Failed to refresh invoice list');
     }
   };
@@ -177,12 +221,14 @@ const BillingPage: React.FC = () => {
     try {
       // This would typically export to CSV/Excel
       toast.success('Exporting invoice list...');
-    } catch (error) {
+    } catch {
       toast.error('Failed to export invoice list');
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (
+    status: string
+  ): 'success' | 'warning' | 'error' | 'default' => {
     switch (status?.toLowerCase()) {
       case 'paid':
         return 'success';
@@ -245,9 +291,6 @@ const BillingPage: React.FC = () => {
       </Box>
     );
   }
-
-  const invoices = invoicesData?.data || [];
-  const totalCount = invoicesData?.pagination.total || 0;
 
   return (
     <Box>
@@ -322,70 +365,136 @@ const BillingPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id} hover>
-                  <TableCell>
-                    <Box display='flex' alignItems='center' gap={2}>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>
-                        <Receipt />
-                      </Avatar>
-                      <Box>
-                        <Typography variant='body2' fontWeight={500}>
-                          {invoice.number}
-                        </Typography>
-                        <Typography variant='caption' color='text.secondary'>
-                          ID: {invoice.id.slice(-8)}
-                        </Typography>
+              {isLoading ? (
+                // Loading skeleton rows
+                [...Array(5)].map((_, index) => (
+                  <TableRow key={`loading-${index}`}>
+                    <TableCell>
+                      <Box display='flex' alignItems='center' gap={2}>
+                        <Skeleton variant='circular' width={40} height={40} />
+                        <Box>
+                          <Skeleton variant='text' width={120} height={20} />
+                          <Skeleton variant='text' width={80} height={16} />
+                        </Box>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <Typography variant='body2'>
-                        {invoice.patientName || 'Unknown Patient'}
-                      </Typography>
-                      <Typography variant='caption' color='text.secondary'>
-                        Patient ID: {invoice.patientId.slice(-8)}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant='body2' fontWeight={500}>
-                      {formatCurrency(invoice.totalAmount)}
-                    </Typography>
-                    <Typography variant='caption' color='text.secondary'>
-                      {invoice.currency || 'NGN'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={invoice.status}
-                      color={getStatusColor(invoice.status) as any}
-                      size='small'
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant='body2'>
-                      {formatDate(invoice.dueDate)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant='body2'>
-                      {formatDate(invoice.createdAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align='right'>
-                    <Tooltip title='More actions'>
-                      <IconButton
-                        onClick={(e) => handleActionMenuOpen(e, invoice)}
-                        size='small'
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Skeleton variant='text' width={100} height={20} />
+                        <Skeleton variant='text' width={80} height={16} />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant='text' width={80} height={20} />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant='rectangular' width={60} height={24} />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant='text' width={80} height={20} />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant='text' width={80} height={20} />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant='circular' width={32} height={32} />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : invoices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align='center' sx={{ py: 4 }}>
+                    <Box textAlign='center'>
+                      <Typography
+                        variant='body1'
+                        color='text.secondary'
+                        gutterBottom
                       >
-                        <MoreVert />
-                      </IconButton>
-                    </Tooltip>
+                        No invoices found
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        {searchQuery || statusFilter
+                          ? 'Try adjusting your search or filters'
+                          : 'Create your first invoice to get started'}
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                invoices.map((invoice) => (
+                  <TableRow key={invoice.id} hover>
+                    <TableCell>
+                      <Box display='flex' alignItems='center' gap={2}>
+                        <Avatar sx={{ bgcolor: 'primary.main' }}>
+                          <Receipt />
+                        </Avatar>
+                        <Box>
+                          <Typography variant='body2' fontWeight={500}>
+                            {invoice.invoiceNumber || invoice.number || 'N/A'}
+                          </Typography>
+                          <Typography variant='caption' color='text.secondary'>
+                            ID: {invoice.id?.slice(-8) || 'N/A'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant='body2'>
+                          {invoice.patientName ||
+                            (invoice.patient
+                              ? `${invoice.patient.firstName} ${invoice.patient.lastName}`
+                              : 'Unknown Patient')}
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary'>
+                          Patient ID: {invoice.patientId?.slice(-8) || 'N/A'}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant='body2' fontWeight={500}>
+                        {formatCurrency(Number(invoice.totalAmount) || 0)}
+                      </Typography>
+                      <Typography variant='caption' color='text.secondary'>
+                        {invoice.currency || 'NGN'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={invoice.status || 'Unknown'}
+                        color={getStatusColor(invoice.status || '')}
+                        size='small'
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant='body2'>
+                        {invoice.dueDate
+                          ? formatDate(invoice.dueDate)
+                          : invoice.issuedDate
+                          ? formatDate(invoice.issuedDate)
+                          : 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant='body2'>
+                        {invoice.createdAt
+                          ? formatDate(invoice.createdAt)
+                          : 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align='right'>
+                      <Tooltip title='More actions'>
+                        <IconButton
+                          onClick={(e) => handleActionMenuOpen(e, invoice)}
+                          size='small'
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>

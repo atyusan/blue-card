@@ -16,6 +16,7 @@ import {
   ViewList,
   ViewModule,
   MoreVert,
+  ArrowBack,
 } from '@mui/icons-material';
 
 interface PageHeaderProps {
@@ -28,6 +29,7 @@ interface PageHeaderProps {
   onRefresh?: () => void;
   onDownload?: () => void;
   onFilter?: () => void;
+  onBack?: () => void;
   viewMode?: 'list' | 'grid';
   onViewModeChange?: (mode: 'list' | 'grid') => void;
   showViewToggle?: boolean;
@@ -54,6 +56,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   onRefresh,
   onDownload,
   onFilter,
+  onBack,
   viewMode = 'list',
   onViewModeChange,
   showViewToggle = false,
@@ -75,6 +78,19 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       >
         <Box sx={{ flex: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            {onBack && (
+              <Tooltip title='Go Back'>
+                <IconButton
+                  onClick={onBack}
+                  sx={{
+                    backgroundColor: 'grey.100',
+                    '&:hover': { backgroundColor: 'grey.200' },
+                  }}
+                >
+                  <ArrowBack />
+                </IconButton>
+              </Tooltip>
+            )}
             <Typography
               variant='h4'
               component='h1'
