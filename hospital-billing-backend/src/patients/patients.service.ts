@@ -4,12 +4,17 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { BillingService } from '../billing/billing.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { InvoiceStatus } from '../billing/dto/create-invoice.dto';
 
 @Injectable()
 export class PatientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private billingService: BillingService,
+  ) {}
 
   async create(createPatientDto: CreatePatientDto) {
     // Generate unique patient ID
@@ -106,6 +111,9 @@ export class PatientsService {
         balance: 0,
       },
     });
+
+    // Create Patient Medical Card invoice automatically
+    await this.createPatientMedicalCardInvoice(patient.id);
 
     return this.findById(patient.id);
   }
@@ -1199,5 +1207,48 @@ export class PatientsService {
     }
 
     return username;
+  }
+
+  private async createPatientMedicalCardInvoice(patientId: string) {
+    try {
+      // Find the Patient Medical Card service
+      const medicalCardService = await this.prisma.service.findFirst({
+        where: {
+          name: 'Patient Medical Card',
+          isActive: true,
+        },
+      });
+
+      if (!medicalCardService) {
+        console.warn(
+          'Patient Medical Card service not found. Skipping invoice creation.',
+        );
+        return;
+      }
+
+      // Create the invoice using the unified billing system
+      await this.billingService.createInvoice({
+        patientId,
+        status: InvoiceStatus.PENDING,
+        notes: 'Patient Medical Card - Required for hospital service access',
+        charges: [
+          {
+            serviceId: medicalCardService.id,
+            description:
+              'Patient Medical Card - Registration and card issuance',
+            quantity: 1,
+            unitPrice: Number(medicalCardService.currentPrice),
+          },
+        ],
+      });
+
+      console.log(
+        `✅ Patient Medical Card invoice created for patient ${patientId}`,
+      );
+    } catch (error) {
+      console.error('❌ Failed to create Patient Medical Card invoice:', error);
+      // Don't throw error to prevent patient creation from failing
+      // The invoice can be created manually later if needed
+    }
   }
 }

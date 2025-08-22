@@ -1126,6 +1126,10 @@ async function seedServiceCategories() {
       name: 'Rehabilitation',
       description: 'Physical therapy and rehabilitation services',
     },
+    {
+      name: 'Registration',
+      description: 'Patient registration and administrative services',
+    },
   ];
 
   for (const categoryData of categories) {
@@ -1158,6 +1162,9 @@ async function seedServices() {
   });
   const inpatientCategory = await prisma.serviceCategory.findUnique({
     where: { name: 'Inpatient' },
+  });
+  const registrationCategory = await prisma.serviceCategory.findUnique({
+    where: { name: 'Registration' },
   });
 
   const services = [
@@ -1288,6 +1295,18 @@ async function seedServices() {
       currentPrice: 400.0,
       serviceCode: 'INP002',
       requiresPrePayment: false,
+    },
+
+    // Registration
+    {
+      name: 'Patient Medical Card',
+      description:
+        'Patient registration and medical card issuance - Required for hospital service access',
+      categoryId: registrationCategory!.id,
+      basePrice: 100.0,
+      currentPrice: 100.0,
+      serviceCode: 'REG001',
+      requiresPrePayment: true,
     },
   ];
 
