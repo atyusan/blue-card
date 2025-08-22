@@ -30,6 +30,7 @@ import {
   Avatar,
   Tooltip,
   Skeleton,
+  Stack,
 } from '@mui/material';
 import {
   Search,
@@ -42,6 +43,7 @@ import {
   Payment,
   Print,
   Download,
+  Cancel,
 } from '@mui/icons-material';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -65,6 +67,13 @@ const BillingPage: React.FC = () => {
     null
   );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
   // Query parameters
@@ -149,6 +158,43 @@ const BillingPage: React.FC = () => {
     },
   });
 
+  // Cancel invoice mutation
+  const cancelInvoiceMutation = useMutation({
+    mutationFn: (data: { id: string; reason?: string }) =>
+      invoiceService.cancelInvoice(data.id, data.reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice cancelled successfully');
+      setCancelDialogOpen(false);
+      setCancelReason('');
+      setSelectedInvoice(null);
+    },
+    onError: (error) => {
+      console.error('Cancel invoice error:', error);
+      toast.error('Failed to cancel invoice');
+    },
+  });
+
+  // Process payment mutation
+  const processPaymentMutation = useMutation({
+    mutationFn: (paymentData: {
+      amount: number;
+      method: string;
+      reference?: string;
+      notes?: string;
+    }) => invoiceService.processPayment(selectedInvoice!.id, paymentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Payment processed successfully');
+      setPaymentDialogOpen(false);
+      setSelectedInvoice(null);
+    },
+    onError: (error) => {
+      console.error('Process payment error:', error);
+      toast.error('Failed to process payment');
+    },
+  });
+
   // Event handlers
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -196,6 +242,82 @@ const BillingPage: React.FC = () => {
   const handleDeleteInvoice = () => {
     setDeleteDialogOpen(true);
     handleActionMenuClose();
+  };
+
+  const handleCancelInvoice = () => {
+    setCancelDialogOpen(true);
+    handleActionMenuClose();
+  };
+
+  const handleProcessPayment = () => {
+    if (selectedInvoice) {
+      setPaymentAmount(selectedInvoice.balance?.toString() || '');
+    }
+    setPaymentDialogOpen(true);
+    handleActionMenuClose();
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!selectedInvoice) return;
+
+    try {
+      toast.loading('Generating invoice for printing...');
+      const blob = await invoiceService.generateInvoicePDF(selectedInvoice.id);
+
+      // Create a new window for printing
+      const url = window.URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank');
+
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+          // Clean up the URL after printing
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 1000);
+        };
+      } else {
+        // Fallback: download the PDF if popup is blocked
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `invoice-${
+          selectedInvoice.invoiceNumber || selectedInvoice.number
+        }.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Invoice PDF downloaded for printing');
+      }
+    } catch (error) {
+      console.error('Print invoice error:', error);
+      toast.error('Failed to generate invoice for printing');
+    }
+
+    handleActionMenuClose();
+  };
+
+  const handleSubmitPayment = () => {
+    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    const paymentData = {
+      amount: parseFloat(paymentAmount),
+      method: paymentMethod,
+      reference: paymentReference || undefined,
+      notes: paymentNotes || undefined,
+    };
+
+    processPaymentMutation.mutate(paymentData);
+  };
+
+  const resetPaymentForm = () => {
+    setPaymentAmount('');
+    setPaymentMethod('CASH');
+    setPaymentReference('');
+    setPaymentNotes('');
   };
 
   const confirmDeleteInvoice = () => {
@@ -529,13 +651,13 @@ const BillingPage: React.FC = () => {
           </ListItemIcon>
           Edit Invoice
         </MenuItem>
-        <MenuItem>
+        <MenuItem onClick={handleProcessPayment}>
           <ListItemIcon>
             <Payment fontSize='small' sx={{ mr: 1 }} />
           </ListItemIcon>
           Process Payment
         </MenuItem>
-        <MenuItem>
+        <MenuItem onClick={handlePrintInvoice}>
           <ListItemIcon>
             <Print fontSize='small' sx={{ mr: 1 }} />
           </ListItemIcon>
@@ -547,6 +669,12 @@ const BillingPage: React.FC = () => {
           </ListItemIcon>
           Download PDF
         </MenuItem>
+        <MenuItem onClick={handleCancelInvoice} sx={{ color: 'warning.main' }}>
+          <ListItemIcon>
+            <Cancel fontSize='small' sx={{ mr: 1 }} />
+          </ListItemIcon>
+          Cancel Invoice
+        </MenuItem>
         <MenuItem onClick={handleDeleteInvoice} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <Delete fontSize='small' sx={{ mr: 1 }} />
@@ -554,6 +682,54 @@ const BillingPage: React.FC = () => {
           Delete Invoice
         </MenuItem>
       </Menu>
+
+      {/* Cancel Invoice Dialog */}
+      <Dialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>Cancel Invoice</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <Typography>
+              Are you sure you want to cancel invoice{' '}
+              {selectedInvoice?.invoiceNumber || selectedInvoice?.number}? This
+              action will mark the invoice as cancelled.
+            </Typography>
+            <TextField
+              label='Cancellation Reason'
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder='Optional reason for cancellation'
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (selectedInvoice) {
+                cancelInvoiceMutation.mutate({
+                  id: selectedInvoice.id,
+                  reason: cancelReason || undefined,
+                });
+              }
+            }}
+            color='warning'
+            variant='contained'
+            disabled={cancelInvoiceMutation.isPending}
+          >
+            {cancelInvoiceMutation.isPending
+              ? 'Cancelling...'
+              : 'Cancel Invoice'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -574,6 +750,77 @@ const BillingPage: React.FC = () => {
             disabled={deleteInvoiceMutation.isPending}
           >
             {deleteInvoiceMutation.isPending ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Payment Dialog */}
+      <Dialog
+        open={paymentDialogOpen}
+        onClose={() => {
+          setPaymentDialogOpen(false);
+          resetPaymentForm();
+        }}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>Process Payment</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <TextField
+              label='Payment Amount'
+              type='number'
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              fullWidth
+              required
+              inputProps={{ min: 0, step: 0.01 }}
+              helperText={`Outstanding balance: ${formatCurrency(
+                Number(selectedInvoice?.balance) || 0
+              )}`}
+            />
+            <FormControl fullWidth required>
+              <InputLabel>Payment Method</InputLabel>
+              <Select
+                value={paymentMethod}
+                label='Payment Method'
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <MenuItem value='CASH'>Cash</MenuItem>
+                <MenuItem value='CARD'>Card</MenuItem>
+                <MenuItem value='BANK_TRANSFER'>Bank Transfer</MenuItem>
+                <MenuItem value='MOBILE_MONEY'>Mobile Money</MenuItem>
+                <MenuItem value='PAYSTACK_TERMINAL'>Paystack Terminal</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label='Payment Reference'
+              value={paymentReference}
+              onChange={(e) => setPaymentReference(e.target.value)}
+              fullWidth
+              placeholder='Optional reference number'
+            />
+            <TextField
+              label='Notes'
+              value={paymentNotes}
+              onChange={(e) => setPaymentNotes(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder='Optional payment notes'
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSubmitPayment}
+            variant='contained'
+            disabled={processPaymentMutation.isPending}
+          >
+            {processPaymentMutation.isPending
+              ? 'Processing...'
+              : 'Process Payment'}
           </Button>
         </DialogActions>
       </Dialog>

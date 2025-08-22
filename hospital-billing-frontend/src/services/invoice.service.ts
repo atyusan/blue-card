@@ -88,6 +88,17 @@ class InvoiceService {
     await http.delete(`/billing/invoices/${id}`);
   }
 
+  // Cancel invoice
+  async cancelInvoice(id: string, reason?: string): Promise<Invoice> {
+    const response = await http.post<Invoice>(
+      `/billing/invoices/${id}/cancel`,
+      {
+        reason,
+      }
+    );
+    return response;
+  }
+
   // Get invoice statistics
   async getInvoiceStats(): Promise<InvoiceStats> {
     const response = await http.get<InvoiceStats>('/billing/invoices/stats');
@@ -120,16 +131,6 @@ class InvoiceService {
   // Get invoice payments
   async getInvoicePayments(id: string): Promise<any[]> {
     const response = await http.get<any[]>(`/billing/invoices/${id}/payments`);
-    return response;
-  }
-
-  // Cancel invoice
-  async cancelInvoice(id: string, reason?: string): Promise<Invoice> {
-    const payload = reason ? { reason } : {};
-    const response = await http.post<Invoice>(
-      `/billing/invoices/${id}/cancel`,
-      payload
-    );
     return response;
   }
 

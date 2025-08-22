@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { PaystackService } from '../paystack/paystack.service';
+import * as puppeteer from 'puppeteer';
 import {
   CreateInvoiceDto,
   UpdateInvoiceDto,
@@ -388,6 +389,39 @@ export class BillingService {
     });
 
     return updatedInvoice;
+  }
+
+  async deleteInvoice(id: string) {
+    const invoice = await this.findInvoiceById(id);
+
+    // Check if invoice can be deleted
+    if (invoice.status === 'PAID') {
+      throw new ConflictException('Cannot delete a paid invoice');
+    }
+
+    if (invoice.status === 'PARTIAL') {
+      throw new ConflictException(
+        'Cannot delete an invoice with partial payments',
+      );
+    }
+
+    if (invoice.payments && invoice.payments.length > 0) {
+      throw new ConflictException(
+        'Cannot delete an invoice with payment history',
+      );
+    }
+
+    // Delete charges first (due to foreign key constraints)
+    await this.prisma.charge.deleteMany({
+      where: { invoiceId: id },
+    });
+
+    // Delete the invoice
+    await this.prisma.invoice.delete({
+      where: { id },
+    });
+
+    return { message: 'Invoice deleted successfully' };
   }
 
   async getInvoiceSummary(patientId: string) {
@@ -999,5 +1033,361 @@ export class BillingService {
       paystackInvoiceId: invoice.paystackInvoiceId,
       paystackReference: invoice.paystackReference,
     };
+  }
+
+  // PDF Generation
+  async generateInvoicePDF(invoiceId: string): Promise<Buffer> {
+    const invoice = await this.findInvoiceById(invoiceId);
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    // Generate HTML content for the invoice
+    const htmlContent = this.generateInvoiceHTML(invoice);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+      // Generate PDF
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px',
+        },
+      });
+
+      return Buffer.from(pdfBuffer);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private generateInvoiceHTML(invoice: any): string {
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(amount);
+    };
+
+    const formatDate = (date: Date | string | null) => {
+      if (!date) return 'N/A';
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    };
+
+    const subtotal = invoice.charges.reduce(
+      (sum: number, charge: any) => sum + Number(charge.totalPrice),
+      0,
+    );
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Invoice ${invoice.invoiceNumber}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                color: #333;
+                line-height: 1.6;
+            }
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #2563eb;
+                padding-bottom: 20px;
+            }
+            .hospital-info h1 {
+                margin: 0;
+                color: #2563eb;
+                font-size: 24px;
+            }
+            .hospital-info p {
+                margin: 5px 0;
+                color: #666;
+            }
+            .invoice-info {
+                text-align: right;
+            }
+            .invoice-info h2 {
+                margin: 0;
+                color: #2563eb;
+                font-size: 28px;
+            }
+            .invoice-details {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 30px;
+            }
+            .patient-info, .invoice-meta {
+                width: 45%;
+            }
+            .patient-info h3, .invoice-meta h3 {
+                margin-bottom: 10px;
+                color: #2563eb;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 5px;
+            }
+            .info-row {
+                display: flex;
+                margin-bottom: 5px;
+            }
+            .info-label {
+                font-weight: bold;
+                width: 120px;
+                color: #374151;
+            }
+            .info-value {
+                color: #6b7280;
+            }
+            .charges-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 30px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .charges-table th {
+                background-color: #2563eb;
+                color: white;
+                padding: 12px;
+                text-align: left;
+                font-weight: bold;
+            }
+            .charges-table td {
+                padding: 12px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .charges-table tr:nth-child(even) {
+                background-color: #f9fafb;
+            }
+            .text-right {
+                text-align: right;
+            }
+            .text-center {
+                text-align: center;
+            }
+            .summary {
+                margin-left: auto;
+                width: 300px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .summary-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 12px 16px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .summary-row:last-child {
+                border-bottom: none;
+                background-color: #2563eb;
+                color: white;
+                font-weight: bold;
+                font-size: 18px;
+            }
+            .summary-label {
+                font-weight: bold;
+            }
+            .status-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+            .status-paid {
+                background-color: #dcfce7;
+                color: #166534;
+            }
+            .status-pending {
+                background-color: #fef3c7;
+                color: #92400e;
+            }
+            .status-partial {
+                background-color: #fef3c7;
+                color: #92400e;
+            }
+            .status-overdue {
+                background-color: #fee2e2;
+                color: #991b1b;
+            }
+            .status-cancelled {
+                background-color: #f3f4f6;
+                color: #374151;
+            }
+            .footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e5e7eb;
+                text-align: center;
+                color: #6b7280;
+                font-size: 14px;
+            }
+            .notes {
+                margin-top: 30px;
+                padding: 16px;
+                background-color: #f9fafb;
+                border-left: 4px solid #2563eb;
+                border-radius: 4px;
+            }
+            .notes h4 {
+                margin: 0 0 10px 0;
+                color: #2563eb;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="hospital-info">
+                <h1>Hospital Billing System</h1>
+                <p>123 Medical Center Drive</p>
+                <p>Healthcare City, HC 12345</p>
+                <p>Phone: (555) 123-4567</p>
+                <p>Email: billing@hospital.com</p>
+            </div>
+            <div class="invoice-info">
+                <h2>INVOICE</h2>
+                <p><strong>${invoice.invoiceNumber}</strong></p>
+            </div>
+        </div>
+
+        <div class="invoice-details">
+            <div class="patient-info">
+                <h3>Bill To:</h3>
+                <div class="info-row">
+                    <span class="info-label">Patient ID:</span>
+                    <span class="info-value">${invoice.patient.patientId}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">${invoice.patient.firstName} ${invoice.patient.lastName}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">${invoice.patient.phoneNumber || 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">${invoice.patient.email || 'N/A'}</span>
+                </div>
+            </div>
+            
+            <div class="invoice-meta">
+                <h3>Invoice Details:</h3>
+                <div class="info-row">
+                    <span class="info-label">Issue Date:</span>
+                    <span class="info-value">${formatDate(invoice.issuedDate)}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Due Date:</span>
+                    <span class="info-value">${formatDate(invoice.dueDate)}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-${invoice.status.toLowerCase()}">${invoice.status}</span>
+                    </span>
+                </div>
+                ${
+                  invoice.paidDate
+                    ? `
+                <div class="info-row">
+                    <span class="info-label">Paid Date:</span>
+                    <span class="info-value">${formatDate(invoice.paidDate)}</span>
+                </div>
+                `
+                    : ''
+                }
+            </div>
+        </div>
+
+        <table class="charges-table">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Description</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-right">Unit Price</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${invoice.charges
+                  .map(
+                    (charge: any) => `
+                <tr>
+                    <td>${charge.service?.name || 'Service'}</td>
+                    <td>${charge.description || 'N/A'}</td>
+                    <td class="text-center">${charge.quantity}</td>
+                    <td class="text-right">${formatCurrency(Number(charge.unitPrice))}</td>
+                    <td class="text-right">${formatCurrency(Number(charge.totalPrice))}</td>
+                </tr>
+                `,
+                  )
+                  .join('')}
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <div class="summary-row">
+                <span class="summary-label">Subtotal:</span>
+                <span>${formatCurrency(subtotal)}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Total Amount:</span>
+                <span>${formatCurrency(Number(invoice.totalAmount))}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Paid Amount:</span>
+                <span>${formatCurrency(Number(invoice.paidAmount))}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Balance Due:</span>
+                <span>${formatCurrency(Number(invoice.balance))}</span>
+            </div>
+        </div>
+
+        ${
+          invoice.notes
+            ? `
+        <div class="notes">
+            <h4>Notes:</h4>
+            <p>${invoice.notes}</p>
+        </div>
+        `
+            : ''
+        }
+
+        <div class="footer">
+            <p>Thank you for choosing our healthcare services.</p>
+            <p>For questions about this invoice, please contact our billing department.</p>
+            <p>Generated on ${formatDate(new Date())}</p>
+        </div>
+    </body>
+    </html>
+    `;
   }
 }

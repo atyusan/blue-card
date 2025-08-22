@@ -287,7 +287,7 @@ const Layout: React.FC = () => {
               variant='h6'
               sx={{ fontWeight: 700, color: 'text.primary' }}
             >
-              Hospital Billing
+              Caresync Hospital
             </Typography>
             <Typography variant='body2' color='text.secondary'>
               Management System

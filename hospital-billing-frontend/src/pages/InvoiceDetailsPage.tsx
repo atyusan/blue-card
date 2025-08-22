@@ -33,13 +33,13 @@ import {
 } from '@mui/material';
 import {
   Print,
-  Download,
   Email,
   MoreVert,
   Payment,
   Edit,
   ContentCopy,
   Cancel,
+  Delete,
   Person,
   Phone,
   AccountBalance,
@@ -70,6 +70,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Fetch invoice details
   const {
@@ -131,6 +132,20 @@ const InvoiceDetailsPage: React.FC = () => {
     },
   });
 
+  // Delete invoice mutation
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: () => invoiceService.deleteInvoice(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice deleted successfully');
+      navigate('/billing');
+    },
+    onError: (error) => {
+      console.error('Delete invoice error:', error);
+      toast.error('Failed to delete invoice');
+    },
+  });
+
   // Event handlers
   const handleBack = () => {
     navigate('/billing');
@@ -160,26 +175,39 @@ const InvoiceDetailsPage: React.FC = () => {
     handleActionMenuClose();
   };
 
-  const handlePrint = () => {
-    window.print();
-    handleActionMenuClose();
-  };
-
-  const handleDownloadPDF = async () => {
+  const handlePrintPDF = async () => {
     try {
+      toast.loading('Generating invoice for printing...');
       const blob = await invoiceService.generateInvoicePDF(id!);
+
+      // Create a new window for printing
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `invoice-${invoice?.invoiceNumber || id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('PDF downloaded successfully');
+      const printWindow = window.open(url, '_blank');
+
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+          // Clean up the URL after printing
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 1000);
+        };
+      } else {
+        // Fallback: download the PDF if popup is blocked
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `invoice-${invoice?.invoiceNumber || id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Invoice PDF downloaded for printing');
+      }
     } catch (error) {
-      toast.error('Failed to download PDF');
+      console.error('Print PDF error:', error);
+      toast.error('Failed to generate invoice for printing');
     }
+
     handleActionMenuClose();
   };
 
@@ -379,18 +407,10 @@ const InvoiceDetailsPage: React.FC = () => {
                   <Button
                     variant='outlined'
                     startIcon={<Print />}
-                    onClick={handlePrint}
+                    onClick={handlePrintPDF}
                     size='small'
                   >
-                    Print
-                  </Button>
-                  <Button
-                    variant='outlined'
-                    startIcon={<Download />}
-                    onClick={handleDownloadPDF}
-                    size='small'
-                  >
-                    PDF
+                    Print Invoice
                   </Button>
                   <IconButton onClick={handleActionMenuOpen} size='small'>
                     <MoreVert />
@@ -712,6 +732,12 @@ const InvoiceDetailsPage: React.FC = () => {
           </ListItemIcon>
           Send via Email
         </MenuItem>
+        <MenuItem onClick={handlePrintPDF}>
+          <ListItemIcon>
+            <Print fontSize='small' />
+          </ListItemIcon>
+          Print Invoice
+        </MenuItem>
         {invoice.status !== 'CANCELLED' && Number(invoice.balance) > 0 && (
           <MenuItem onClick={handleProcessPayment}>
             <ListItemIcon>
@@ -721,11 +747,25 @@ const InvoiceDetailsPage: React.FC = () => {
           </MenuItem>
         )}
         {invoice.status !== 'CANCELLED' && (
-          <MenuItem onClick={handleCancelInvoice} sx={{ color: 'error.main' }}>
+          <MenuItem
+            onClick={handleCancelInvoice}
+            sx={{ color: 'warning.main' }}
+          >
             <ListItemIcon>
               <Cancel fontSize='small' />
             </ListItemIcon>
             Cancel Invoice
+          </MenuItem>
+        )}
+        {invoice.status !== 'CANCELLED' && invoice.status !== 'PAID' && (
+          <MenuItem
+            onClick={() => setDeleteDialogOpen(true)}
+            sx={{ color: 'error.main' }}
+          >
+            <ListItemIcon>
+              <Delete fontSize='small' />
+            </ListItemIcon>
+            Delete Invoice
           </MenuItem>
         )}
       </Menu>
@@ -866,6 +906,36 @@ const InvoiceDetailsPage: React.FC = () => {
             {cancelInvoiceMutation.isPending
               ? 'Cancelling...'
               : 'Cancel Invoice'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>Delete Invoice</DialogTitle>
+        <DialogContent>
+          <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+            Are you sure you want to delete invoice{' '}
+            {invoice?.invoiceNumber || invoice?.number}? This action cannot be
+            undone and will permanently remove the invoice.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>
+            Keep Invoice
+          </Button>
+          <Button
+            onClick={() => deleteInvoiceMutation.mutate()}
+            variant='contained'
+            color='error'
+            disabled={deleteInvoiceMutation.isPending}
+          >
+            {deleteInvoiceMutation.isPending ? 'Deleting...' : 'Delete Invoice'}
           </Button>
         </DialogActions>
       </Dialog>

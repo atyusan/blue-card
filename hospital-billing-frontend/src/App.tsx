@@ -24,6 +24,7 @@ import AddPatientPage from './pages/AddPatientPage';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import BillingPage from './pages/BillingPage';
 import InvoiceDetailsPage from './pages/InvoiceDetailsPage';
+import InvoiceEditPage from './pages/InvoiceEditPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import Layout from './components/layout/Layout';
 
@@ -116,7 +117,7 @@ function App() {
                   <Route path='billing/:id' element={<InvoiceDetailsPage />} />
                   <Route
                     path='billing/:id/edit'
-                    element={<div>Invoice Edit Page</div>}
+                    element={<InvoiceEditPage />}
                   />
 
                   {/* Appointments Routes */}

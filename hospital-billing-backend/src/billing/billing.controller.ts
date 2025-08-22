@@ -10,7 +10,9 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -107,6 +109,37 @@ export class BillingController {
     return this.billingService.findInvoiceById(id);
   }
 
+  @Get('invoices/:id/pdf')
+  @ApiOperation({ summary: 'Generate PDF for invoice' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF generated successfully',
+    headers: {
+      'Content-Type': {
+        description: 'application/pdf',
+      },
+      'Content-Disposition': {
+        description: 'attachment; filename="invoice-{invoiceNumber}.pdf"',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invoice not found',
+  })
+  async generateInvoicePDF(@Param('id') id: string, @Res() response: Response) {
+    const pdfBuffer = await this.billingService.generateInvoicePDF(id);
+    const invoice = await this.billingService.findInvoiceById(id);
+
+    response.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    response.send(pdfBuffer);
+  }
+
   @Get('invoices/by-number/:invoiceNumber')
   @ApiOperation({ summary: 'Get invoice by invoice number' })
   @ApiResponse({
@@ -172,6 +205,24 @@ export class BillingController {
   })
   cancelInvoice(@Param('id') id: string, @Body() body: { reason?: string }) {
     return this.billingService.cancelInvoice(id, body.reason);
+  }
+
+  @Delete('invoices/:id')
+  @ApiOperation({ summary: 'Delete an invoice' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice deleted successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Invoice not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Invoice cannot be deleted',
+  })
+  deleteInvoice(@Param('id') id: string) {
+    return this.billingService.deleteInvoice(id);
   }
 
   // Charge Management
