@@ -182,12 +182,18 @@ const BillingPage: React.FC = () => {
       method: string;
       reference?: string;
       notes?: string;
-    }) => invoiceService.processPayment(selectedInvoice!.id, paymentData),
+    }) => {
+      if (!selectedInvoice) {
+        throw new Error('No invoice selected for payment');
+      }
+      return invoiceService.processPayment(selectedInvoice.id, paymentData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Payment processed successfully');
       setPaymentDialogOpen(false);
       setSelectedInvoice(null);
+      handleActionMenuClose(); // Close the action menu after successful payment
     },
     onError: (error) => {
       console.error('Process payment error:', error);
@@ -254,7 +260,7 @@ const BillingPage: React.FC = () => {
       setPaymentAmount(selectedInvoice.balance?.toString() || '');
     }
     setPaymentDialogOpen(true);
-    handleActionMenuClose();
+    // Don't close the action menu yet - keep selectedInvoice until payment is processed
   };
 
   const handlePrintInvoice = async () => {
@@ -298,6 +304,11 @@ const BillingPage: React.FC = () => {
   };
 
   const handleSubmitPayment = () => {
+    if (!selectedInvoice) {
+      toast.error('No invoice selected for payment');
+      return;
+    }
+
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
       toast.error('Please enter a valid payment amount');
       return;
