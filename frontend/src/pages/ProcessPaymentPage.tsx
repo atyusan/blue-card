@@ -30,13 +30,14 @@ import { paymentService } from '../services/payment.service';
 import { invoiceService } from '../services/invoice.service';
 import { patientService } from '../services/patient.service';
 import { formatCurrency, formatDate } from '../utils';
+import { InvoiceStatus } from '../types';
 
 interface PaymentData {
   invoiceId: string;
   patientId: string;
   amount: string;
-  method: string;
-  reference: string;
+  paymentMethod: string;
+  referenceNumber: string;
   notes: string;
   processDate: Date | null;
   fee: number;
@@ -50,8 +51,8 @@ interface ValidationErrors {
   invoiceId?: string;
   patientId?: string;
   amount?: string;
-  method?: string;
-  reference?: string;
+  paymentMethod?: string;
+  referenceNumber?: string;
   processDate?: string;
 }
 
@@ -64,11 +65,12 @@ const steps = [
 ];
 
 const paymentMethods = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Credit/Debit Card' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'check', label: 'Check' },
-  { value: 'insurance', label: 'Insurance' },
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CARD', label: 'Credit/Debit Card' },
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+  { value: 'MOBILE_MONEY', label: 'Mobile Money' },
+  { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'CREDIT', label: 'Credit' },
 ];
 
 const feeTypes = [
@@ -83,8 +85,8 @@ export default function ProcessPaymentPage() {
     invoiceId: '',
     patientId: '',
     amount: '',
-    method: '',
-    reference: '',
+    paymentMethod: '',
+    referenceNumber: '',
     notes: '',
     processDate: new Date(),
     fee: 0,
@@ -103,8 +105,9 @@ export default function ProcessPaymentPage() {
 
   // Fetch invoices
   const { data: invoicesResponse } = useQuery({
-    queryKey: ['invoices', 'unpaid'],
-    queryFn: () => invoiceService.getInvoices({ status: 'unpaid' }),
+    queryKey: ['invoices', 'pending'],
+    queryFn: () =>
+      invoiceService.getInvoices({ status: InvoiceStatus.PENDING }),
   });
 
   // Fetch patients
@@ -113,8 +116,16 @@ export default function ProcessPaymentPage() {
     queryFn: () => patientService.getPatients(),
   });
 
-  const invoices = invoicesResponse?.data || [];
-  const patients = patientsResponse?.data || [];
+  // Helper function to safely extract data from API response
+  const extractData = (response: any): any[] => {
+    if (!response) return [];
+    if (Array.isArray(response)) return response;
+    if (response.data && Array.isArray(response.data)) return response.data;
+    return [];
+  };
+
+  const invoices = extractData(invoicesResponse);
+  const patients = extractData(patientsResponse);
 
   // Process payment mutation
   const processPaymentMutation = useMutation({
@@ -149,8 +160,10 @@ export default function ProcessPaymentPage() {
         break;
       case 1:
         if (!paymentData.amount) errors.amount = 'Amount is required';
-        if (!paymentData.method) errors.method = 'Payment method is required';
-        if (!paymentData.reference) errors.reference = 'Reference is required';
+        if (!paymentData.paymentMethod)
+          errors.paymentMethod = 'Payment method is required';
+        if (!paymentData.referenceNumber)
+          errors.referenceNumber = 'Reference is required';
         if (!paymentData.processDate)
           errors.processDate = 'Process date is required';
         break;
@@ -164,13 +177,45 @@ export default function ProcessPaymentPage() {
     const invoice = invoices.find((inv: any) => inv.id === invoiceId);
     if (invoice) {
       setSelectedInvoice(invoice);
+
+      // Find the associated patient
+      const patient = patients.find((p: any) => p.id === invoice.patientId);
+      setSelectedPatient(patient);
+
+      // Auto-populate form fields with invoice and patient data
       setPaymentData((prev) => ({
         ...prev,
         invoiceId,
         patientId: invoice.patientId,
         amount: invoice.totalAmount.toString(),
+        // Auto-generate reference number if not already set
+        referenceNumber:
+          prev.referenceNumber ||
+          `PAY-${
+            invoice.invoiceNumber || invoice.number || invoice.id.slice(-8)
+          }`,
+        // Auto-populate receipt email if patient has email and not already set
+        receiptEmail: prev.receiptEmail || patient?.email || '',
+        // Auto-populate notes with invoice context if not already set
+        notes:
+          prev.notes ||
+          `Payment for invoice ${
+            invoice.invoiceNumber || invoice.number || invoice.id.slice(-8)
+          }`,
       }));
-      setSelectedPatient(patients.find((p: any) => p.id === invoice.patientId));
+
+      // Show success message
+      toast.success(
+        `Invoice ${
+          invoice.invoiceNumber || invoice.number || invoice.id.slice(-8)
+        } selected. Form fields auto-populated.`
+      );
+    } else {
+      console.error(
+        '❌ [ProcessPaymentPage] Invoice not found for ID:',
+        invoiceId
+      );
+      toast.error('Invoice not found. Please try again.');
     }
   };
 
@@ -184,22 +229,19 @@ export default function ProcessPaymentPage() {
 
   const handleProcessPayment = () => {
     if (validateStep()) {
+      // Only send fields that are allowed by the CreatePaymentDto
       const payload = {
         invoiceId: paymentData.invoiceId,
         patientId: paymentData.patientId,
         amount: parseFloat(paymentData.amount),
-        method: paymentData.method,
-        reference: paymentData.reference,
-        notes: paymentData.notes,
-        processDate:
-          paymentData.processDate?.toISOString() || new Date().toISOString(),
-        fee: paymentData.fee,
-        feeType: paymentData.feeType as 'FIXED' | 'PERCENTAGE' | undefined,
-        feeValue: paymentData.feeValue,
-        sendReceipt: paymentData.sendReceipt,
-        receiptEmail: paymentData.receiptEmail,
+        paymentMethod: paymentData.paymentMethod,
+        ...(paymentData.referenceNumber && {
+          referenceNumber: paymentData.referenceNumber,
+        }),
+        ...(paymentData.notes && { notes: paymentData.notes }),
       };
 
+      console.log('Submitting payment payload:', payload);
       processPaymentMutation.mutate(payload);
     }
   };
@@ -215,6 +257,23 @@ export default function ProcessPaymentPage() {
     }
 
     return baseAmount + feeAmount;
+  };
+
+  // Auto-generate reference number
+  const generateReferenceNumber = () => {
+    const timestamp = new Date().getTime().toString().slice(-6);
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `PAY-${timestamp}-${random}`;
+  };
+
+  // Auto-populate reference number if empty
+  const handleReferenceFocus = () => {
+    if (!paymentData.referenceNumber) {
+      setPaymentData((prev) => ({
+        ...prev,
+        referenceNumber: generateReferenceNumber(),
+      }));
+    }
   };
 
   const renderStepContent = () => {
@@ -379,14 +438,18 @@ export default function ProcessPaymentPage() {
                 helperText={validationErrors.amount}
               />
 
-              <FormControl fullWidth required error={!!validationErrors.method}>
+              <FormControl
+                fullWidth
+                required
+                error={!!validationErrors.paymentMethod}
+              >
                 <InputLabel>Payment Method</InputLabel>
                 <Select
-                  value={paymentData.method}
+                  value={paymentData.paymentMethod}
                   onChange={(e) =>
                     setPaymentData((prev) => ({
                       ...prev,
-                      method: e.target.value,
+                      paymentMethod: e.target.value,
                     }))
                   }
                   label='Payment Method'
@@ -411,16 +474,21 @@ export default function ProcessPaymentPage() {
               <TextField
                 fullWidth
                 label='Reference Number'
-                value={paymentData.reference}
+                value={paymentData.referenceNumber}
                 onChange={(e) =>
                   setPaymentData((prev) => ({
                     ...prev,
-                    reference: e.target.value,
+                    referenceNumber: e.target.value,
                   }))
                 }
+                onFocus={handleReferenceFocus}
                 required
-                error={!!validationErrors.reference}
-                helperText={validationErrors.reference}
+                error={!!validationErrors.referenceNumber}
+                helperText={
+                  validationErrors.referenceNumber ||
+                  'Auto-generated if left empty'
+                }
+                placeholder='Click to auto-generate'
               />
 
               <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -643,10 +711,10 @@ export default function ProcessPaymentPage() {
                     {formatCurrency(calculateTotalAmount())}
                   </Typography>
                   <Typography variant='body2'>
-                    <strong>Method:</strong> {paymentData.method}
+                    <strong>Method:</strong> {paymentData.paymentMethod}
                   </Typography>
                   <Typography variant='body2'>
-                    <strong>Reference:</strong> {paymentData.reference}
+                    <strong>Reference:</strong> {paymentData.referenceNumber}
                   </Typography>
                   <Typography variant='body2'>
                     <strong>Date:</strong>{' '}
@@ -714,10 +782,10 @@ export default function ProcessPaymentPage() {
                     {formatCurrency(calculateTotalAmount())}
                   </Typography>
                   <Typography variant='body2'>
-                    <strong>Payment Method:</strong> {paymentData.method}
+                    <strong>Payment Method:</strong> {paymentData.paymentMethod}
                   </Typography>
                   <Typography variant='body2'>
-                    <strong>Reference:</strong> {paymentData.reference}
+                    <strong>Reference:</strong> {paymentData.referenceNumber}
                   </Typography>
                   <Typography variant='body2'>
                     <strong>Process Date:</strong>{' '}

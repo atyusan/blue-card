@@ -64,15 +64,10 @@ export interface ProcessPaymentData {
   invoiceId: string;
   patientId: string;
   amount: number;
-  method: string;
-  reference?: string;
+  paymentMethod: string;
+  referenceNumber?: string;
   notes?: string;
-  processDate: string;
-  fee?: number;
-  feeType?: 'FIXED' | 'PERCENTAGE';
-  feeValue?: number;
-  sendReceipt?: boolean;
-  receiptEmail?: string;
+  transactionId?: string;
 }
 
 export interface ProcessRefundData {

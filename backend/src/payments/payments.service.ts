@@ -57,6 +57,10 @@ export class PaymentsService {
       );
     }
 
+    // Determine payment status based on payment method
+    // Cash payments are immediately completed, others start as pending
+    const paymentStatus = paymentMethod === 'CASH' ? 'COMPLETED' : 'PENDING';
+
     // Create payment
     const payment = await this.prisma.payment.create({
       data: {
@@ -66,6 +70,7 @@ export class PaymentsService {
         method: paymentMethod,
         reference: referenceNumber,
         notes,
+        status: paymentStatus, // Set status based on payment method
         processedBy: 'system', // TODO: Get from authenticated user
         processedAt: new Date(),
       },
