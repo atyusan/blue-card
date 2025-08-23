@@ -36,8 +36,6 @@ import {
   Search,
   FilterList,
   Visibility,
-  Download,
-  Print,
   Refresh,
   Add,
   MoreVert,
@@ -339,7 +337,7 @@ export default function CashOfficeTransactionsPage() {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl fullWidth size='small'>
+                {/* <FormControl fullWidth size='small'>
                   <InputLabel>Category</InputLabel>
                   <Select
                     value={filters.category}
@@ -355,7 +353,7 @@ export default function CashOfficeTransactionsPage() {
                       </MenuItem>
                     ))}
                   </Select>
-                </FormControl>
+                </FormControl> */}
                 <FormControl fullWidth size='small'>
                   <InputLabel>Status</InputLabel>
                   <Select
@@ -373,7 +371,7 @@ export default function CashOfficeTransactionsPage() {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl fullWidth size='small'>
+                {/* <FormControl fullWidth size='small'>
                   <InputLabel>Method</InputLabel>
                   <Select
                     value={filters.paymentMethod}
@@ -389,7 +387,7 @@ export default function CashOfficeTransactionsPage() {
                       </MenuItem>
                     ))}
                   </Select>
-                </FormControl>
+                </FormControl> */}
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label='Start Date'
@@ -438,22 +436,6 @@ export default function CashOfficeTransactionsPage() {
             }}
           >
             <Typography variant='h6'>Transactions ({totalCount})</Typography>
-            <Stack direction='row' spacing={1}>
-              <Tooltip title='Download CSV'>
-                <IconButton
-                  onClick={() => toast.success('Download feature coming soon')}
-                >
-                  <Download />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title='Print Report'>
-                <IconButton
-                  onClick={() => toast.success('Print feature coming soon')}
-                >
-                  <Print />
-                </IconButton>
-              </Tooltip>
-            </Stack>
           </Box>
 
           <TableContainer>
@@ -462,8 +444,8 @@ export default function CashOfficeTransactionsPage() {
                 <TableRow>
                   <TableCell>Transaction</TableCell>
                   <TableCell>Amount</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Method</TableCell>
+                  {/* <TableCell>Category</TableCell>
+                  <TableCell>Method</TableCell> */}
                   <TableCell>Status</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell align='right'>Actions</TableCell>
@@ -595,7 +577,7 @@ export default function CashOfficeTransactionsPage() {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <Chip
                           label={
                             categories.find(
@@ -605,8 +587,8 @@ export default function CashOfficeTransactionsPage() {
                           size='small'
                           variant='outlined'
                         />
-                      </TableCell>
-                      <TableCell>
+                      </TableCell> */}
+                      {/* <TableCell>
                         <Chip
                           label={
                             paymentMethods.find(
@@ -616,7 +598,7 @@ export default function CashOfficeTransactionsPage() {
                           size='small'
                           variant='outlined'
                         />
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <Chip
                           label={
@@ -670,157 +652,707 @@ export default function CashOfficeTransactionsPage() {
         </CardContent>
       </Card>
 
-      {/* Transaction Details Dialog */}
+      {/* Enhanced Transaction Details Dialog */}
       <Dialog
         open={detailsDialogOpen}
         onClose={() => setDetailsDialogOpen(false)}
-        maxWidth='md'
+        maxWidth='lg'
         fullWidth
       >
         <DialogTitle>
-          Transaction Details
-          {selectedTransaction && (
-            <Typography variant='body2' color='text.secondary'>
-              {selectedTransaction.reference}
-            </Typography>
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: 'primary.main' }}>
+              <AccountBalance />
+            </Avatar>
+            <Box>
+              <Typography variant='h6'>Transaction Details</Typography>
+              {selectedTransaction && (
+                <Typography variant='body2' color='text.secondary'>
+                  {selectedTransaction.reference}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </DialogTitle>
+
         <DialogContent>
           {selectedTransaction && (
-            <>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* Transaction Header */}
+              <Box
+                sx={{
+                  p: 3,
+                  bgcolor: 'primary.light',
+                  borderRadius: 2,
+                  color: 'white',
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant='h4' sx={{ mb: 1, fontWeight: 600 }}>
+                  {formatCurrency(selectedTransaction.amount)}
+                </Typography>
+                <Typography variant='h6' sx={{ mb: 2 }}>
+                  {
+                    transactionTypes.find(
+                      (t) => t.value === selectedTransaction.transactionType
+                    )?.label
+                  }
+                </Typography>
+                <Chip
+                  label={
+                    statuses.find((s) => s.value === selectedTransaction.status)
+                      ?.label
+                  }
+                  color={
+                    statuses.find((s) => s.value === selectedTransaction.status)
+                      ?.color as any
+                  }
+                  variant='filled'
+                  sx={{ color: 'white', fontWeight: 600 }}
+                />
+              </Box>
+
+              {/* Main Transaction Information */}
               <Box
                 sx={{
                   display: 'grid',
+                  gap: 4,
                   gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                  gap: 3,
                 }}
               >
+                {/* Left Column - Basic Info */}
                 <Box>
                   <Typography
-                    variant='subtitle2'
-                    color='text.secondary'
+                    variant='h6'
                     gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
                   >
+                    <BusinessCenter fontSize='small' />
                     Transaction Information
                   </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant='body2'>
-                      <strong>Type:</strong>{' '}
-                      {
-                        transactionTypes.find(
-                          (t) => t.value === selectedTransaction.transactionType
-                        )?.label
-                      }
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Amount:</strong>{' '}
-                      {formatCurrency(selectedTransaction.amount)}
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Status:</strong>{' '}
-                      {
-                        statuses.find(
-                          (s) => s.value === selectedTransaction.status
-                        )?.label
-                      }
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Date:</strong>{' '}
-                      {formatDate(selectedTransaction.transactionDate)}
-                    </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      mt: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Type
+                      </Typography>
+                      <Chip
+                        label={
+                          transactionTypes.find(
+                            (t) =>
+                              t.value === selectedTransaction.transactionType
+                          )?.label
+                        }
+                        color={
+                          transactionTypes.find(
+                            (t) =>
+                              t.value === selectedTransaction.transactionType
+                          )?.color as any
+                        }
+                        size='small'
+                        variant='outlined'
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Category
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {
+                          categories.find(
+                            (c) => c.value === selectedTransaction.category
+                          )?.label
+                        }
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Payment Method
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {
+                          paymentMethods.find(
+                            (m) => m.value === selectedTransaction.paymentMethod
+                          )?.label
+                        }
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Currency
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {selectedTransaction.currency}
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
+
+                {/* Right Column - Dates & References */}
                 <Box>
                   <Typography
-                    variant='subtitle2'
-                    color='text.secondary'
+                    variant='h6'
                     gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
                   >
-                    Payment Details
+                    <Timeline fontSize='small' />
+                    Timeline & References
                   </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant='body2'>
-                      <strong>Method:</strong>{' '}
-                      {
-                        paymentMethods.find(
-                          (m) => m.value === selectedTransaction.paymentMethod
-                        )?.label
-                      }
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Category:</strong>{' '}
-                      {
-                        categories.find(
-                          (c) => c.value === selectedTransaction.category
-                        )?.label
-                      }
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Reference:</strong>{' '}
-                      {selectedTransaction.reference}
-                    </Typography>
-                    {selectedTransaction.notes && (
-                      <Typography variant='body2'>
-                        <strong>Notes:</strong> {selectedTransaction.notes}
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      mt: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Transaction Date
                       </Typography>
-                    )}
+                      <Typography variant='body1' fontWeight={500}>
+                        {formatDate(selectedTransaction.transactionDate)}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Created
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {formatDate(selectedTransaction.createdAt)}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Last Updated
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {formatDate(selectedTransaction.updatedAt)}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Reference
+                      </Typography>
+                      <Typography
+                        variant='body1'
+                        fontWeight={500}
+                        sx={{ fontFamily: 'monospace' }}
+                      >
+                        {selectedTransaction.reference}
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
               </Box>
-              {selectedTransaction.patient && (
-                <Box sx={{ mt: 3 }}>
-                  <Divider sx={{ my: 2 }} />
+
+              {/* Description & Notes */}
+              <Box>
+                <Typography
+                  variant='h6'
+                  gutterBottom
+                  sx={{
+                    borderBottom: 2,
+                    borderColor: 'primary.main',
+                    pb: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Receipt fontSize='small' />
+                  Description & Notes
+                </Typography>
+
+                <Box sx={{ mt: 2 }}>
                   <Typography
                     variant='subtitle2'
                     color='text.secondary'
                     gutterBottom
                   >
+                    Description
+                  </Typography>
+                  <Typography
+                    variant='body1'
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.50',
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor: 'grey.300',
+                    }}
+                  >
+                    {selectedTransaction.description}
+                  </Typography>
+                </Box>
+
+                {selectedTransaction.notes && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography
+                      variant='subtitle2'
+                      color='text.secondary'
+                      gutterBottom
+                    >
+                      Additional Notes
+                    </Typography>
+                    <Typography
+                      variant='body1'
+                      sx={{
+                        p: 2,
+                        bgcolor: 'grey.50',
+                        borderRadius: 1,
+                        border: 1,
+                        borderColor: 'grey.300',
+                      }}
+                    >
+                      {selectedTransaction.notes}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Payment Method Details */}
+              {selectedTransaction.paymentMethod === 'CHECK' &&
+                selectedTransaction.checkNumber && (
+                  <Box>
+                    <Typography
+                      variant='h6'
+                      gutterBottom
+                      sx={{
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        pb: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}
+                    >
+                      <Payment fontSize='small' />
+                      Check Details
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gap: 2,
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                        mt: 2,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Typography variant='subtitle2' color='text.secondary'>
+                          Check Number
+                        </Typography>
+                        <Typography
+                          variant='body1'
+                          fontWeight={500}
+                          sx={{ fontFamily: 'monospace' }}
+                        >
+                          {selectedTransaction.checkNumber}
+                        </Typography>
+                      </Box>
+
+                      {selectedTransaction.bankName && (
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Typography
+                            variant='subtitle2'
+                            color='text.secondary'
+                          >
+                            Bank
+                          </Typography>
+                          <Typography variant='body1' fontWeight={500}>
+                            {selectedTransaction.bankName}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+
+              {/* Bank Transfer Details */}
+              {selectedTransaction.paymentMethod === 'BANK_TRANSFER' && (
+                <Box>
+                  <Typography
+                    variant='h6'
+                    gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <AccountBalance fontSize='small' />
+                    Bank Transfer Details
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 2,
+                      gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                      mt: 2,
+                    }}
+                  >
+                    {selectedTransaction.bankName && (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Typography variant='subtitle2' color='text.secondary'>
+                          Bank Name
+                        </Typography>
+                        <Typography variant='body1' fontWeight={500}>
+                          {selectedTransaction.bankName}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {selectedTransaction.accountNumber && (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Typography variant='subtitle2' color='text.secondary'>
+                          Account Number
+                        </Typography>
+                        <Typography
+                          variant='body1'
+                          fontWeight={500}
+                          sx={{ fontFamily: 'monospace' }}
+                        >
+                          {selectedTransaction.accountNumber}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Processor Information */}
+              {selectedTransaction.processor && (
+                <Box>
+                  <Typography
+                    variant='h6'
+                    gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <BusinessCenter fontSize='small' />
+                    Processed By
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      mt: 2,
+                    }}
+                  >
+                    <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                      {selectedTransaction.processor.firstName?.charAt(0) ||
+                        'U'}
+                      {selectedTransaction.processor.lastName?.charAt(0) || 'K'}
+                    </Avatar>
+                    <Box>
+                      <Typography variant='body1' fontWeight={500}>
+                        {selectedTransaction.processor.firstName || 'Unknown'}{' '}
+                        {selectedTransaction.processor.lastName || 'User'}
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        Transaction Processor
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Patient Information */}
+              {selectedTransaction.patient && (
+                <Box>
+                  <Typography
+                    variant='h6'
+                    gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <BusinessCenter fontSize='small' />
                     Patient Information
                   </Typography>
-                  <Typography variant='body2'>
-                    <strong>Name:</strong>{' '}
-                    {selectedTransaction.patient.firstName}{' '}
-                    {selectedTransaction.patient.lastName}
-                  </Typography>
-                  <Typography variant='body2'>
-                    <strong>Patient ID:</strong>{' '}
-                    {selectedTransaction.patient.patientId}
-                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 2,
+                      gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                      mt: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Patient Name
+                      </Typography>
+                      <Typography variant='body1' fontWeight={500}>
+                        {selectedTransaction.patient.firstName || 'Unknown'}{' '}
+                        {selectedTransaction.patient.lastName || 'Patient'}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Patient ID
+                      </Typography>
+                      <Typography
+                        variant='body1'
+                        fontWeight={500}
+                        sx={{ fontFamily: 'monospace' }}
+                      >
+                        {selectedTransaction.patient.patientId || 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </Box>
               )}
+
+              {/* Invoice Information */}
               {selectedTransaction.invoice && (
-                <Box sx={{ mt: 3 }}>
-                  <Divider sx={{ my: 2 }} />
+                <Box>
                   <Typography
-                    variant='subtitle2'
-                    color='text.secondary'
+                    variant='h6'
                     gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
                   >
+                    <Receipt fontSize='small' />
                     Invoice Information
                   </Typography>
-                  <Typography variant='body2'>
-                    <strong>Invoice Number:</strong>{' '}
-                    {selectedTransaction.invoice.invoiceNumber}
-                  </Typography>
-                  <Typography variant='body2'>
-                    <strong>Total Amount:</strong>{' '}
-                    {formatCurrency(selectedTransaction.invoice.totalAmount)}
-                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 2,
+                      gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                      mt: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Invoice Number
+                      </Typography>
+                      <Typography
+                        variant='body1'
+                        fontWeight={500}
+                        sx={{ fontFamily: 'monospace' }}
+                      >
+                        {selectedTransaction.invoice.invoiceNumber || 'N/A'}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Total Amount
+                      </Typography>
+                      <Typography
+                        variant='h6'
+                        color='primary.main'
+                        fontWeight={600}
+                      >
+                        {formatCurrency(
+                          selectedTransaction.invoice.totalAmount || 0
+                        )}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </Box>
               )}
-            </>
+
+              {/* Receipt Information */}
+              {selectedTransaction.receiptNumber && (
+                <Box>
+                  <Typography
+                    variant='h6'
+                    gutterBottom
+                    sx={{
+                      borderBottom: 2,
+                      borderColor: 'primary.main',
+                      pb: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <Receipt fontSize='small' />
+                    Receipt Information
+                  </Typography>
+
+                  <Box sx={{ mt: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' color='text.secondary'>
+                        Receipt Number
+                      </Typography>
+                      <Typography
+                        variant='body1'
+                        fontWeight={500}
+                        sx={{ fontFamily: 'monospace' }}
+                      >
+                        {selectedTransaction.receiptNumber}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+            </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
-          <Button
-            variant='contained'
-            startIcon={<Download />}
-            onClick={() =>
-              toast.success('Download receipt feature coming soon')
-            }
-          >
-            Download Receipt
+
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={() => setDetailsDialogOpen(false)} color='inherit'>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
@@ -843,18 +1375,7 @@ export default function CashOfficeTransactionsPage() {
           </ListItemIcon>
           Edit Transaction
         </MenuItem>
-        <MenuItem onClick={() => toast.success('Download feature coming soon')}>
-          <ListItemIcon>
-            <Download fontSize='small' />
-          </ListItemIcon>
-          Download Receipt
-        </MenuItem>
-        <MenuItem onClick={() => toast.success('Print feature coming soon')}>
-          <ListItemIcon>
-            <Print fontSize='small' />
-          </ListItemIcon>
-          Print Receipt
-        </MenuItem>
+
         <MenuItem
           onClick={() => toast.error('Delete feature coming soon')}
           sx={{ color: 'error.main' }}
