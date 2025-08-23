@@ -8,7 +8,11 @@ import {
   Delete,
   UseGuards,
   Query,
+  Res,
+  Request,
+  BadRequestException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -109,6 +113,75 @@ export class PaymentsController {
     });
   }
 
+  // Refund Management - GET all refunds (must come before @Get(':id') to avoid conflicts)
+  @Get('refunds')
+  @ApiOperation({ summary: 'Get all refunds' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all refunds',
+  })
+  @ApiQuery({
+    name: 'patientId',
+    required: false,
+    description: 'Filter by patient ID',
+  })
+  @ApiQuery({
+    name: 'invoiceId',
+    required: false,
+    description: 'Filter by invoice ID',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by refund status',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Filter by start date',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Filter by end date',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by patient name, patient ID, or reference',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  findAllRefunds(
+    @Query('patientId') patientId?: string,
+    @Query('invoiceId') invoiceId?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.paymentsService.findAllRefunds({
+      patientId,
+      invoiceId,
+      status,
+      startDate,
+      endDate,
+      search,
+      page,
+      limit,
+    });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get payment by ID' })
   @ApiResponse({
@@ -173,11 +246,12 @@ export class PaymentsController {
     status: 409,
     description: 'Refund is not in pending status',
   })
-  approveRefund(
-    @Param('refundId') refundId: string,
-    @Body() body: { approvedBy: string },
-  ) {
-    return this.paymentsService.approveRefund(refundId, body.approvedBy);
+  approveRefund(@Param('refundId') refundId: string, @Request() req: any) {
+    // Get the authenticated user from the JWT token
+    const user = req.user;
+    const approvedBy = user?.id || user?.sub || 'system';
+
+    return this.paymentsService.approveRefund(refundId, approvedBy);
   }
 
   @Post('refunds/:refundId/reject')
@@ -185,6 +259,10 @@ export class PaymentsController {
   @ApiResponse({
     status: 200,
     description: 'Refund rejected successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Rejection reason is required',
   })
   @ApiResponse({
     status: 404,
@@ -196,12 +274,22 @@ export class PaymentsController {
   })
   rejectRefund(
     @Param('refundId') refundId: string,
-    @Body() body: { rejectedBy: string; rejectionReason: string },
+    @Body() body: { rejectionReason: string },
+    @Request() req: any,
   ) {
+    // Validate that rejection reason is provided
+    if (!body.rejectionReason || body.rejectionReason.trim() === '') {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    // Get the authenticated user from the JWT token
+    const user = req.user;
+    const rejectedBy = user?.id || user?.sub || 'system';
+
     return this.paymentsService.rejectRefund(
       refundId,
-      body.rejectedBy,
-      body.rejectionReason,
+      rejectedBy,
+      body.rejectionReason.trim(),
     );
   }
 
@@ -380,5 +468,75 @@ export class PaymentsController {
       new Date(startDate),
       new Date(endDate),
     );
+  }
+
+  // PDF Generation Endpoints
+  @Get(':id/receipt/pdf')
+  @ApiOperation({ summary: 'Generate PDF for payment receipt' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF generated successfully',
+    headers: {
+      'Content-Type': {
+        description: 'application/pdf',
+      },
+      'Content-Disposition': {
+        description: 'attachment; filename="payment-receipt-{reference}.pdf"',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Payment not found',
+  })
+  async generatePaymentReceiptPDF(
+    @Param('id') id: string,
+    @Res() response: Response,
+  ) {
+    const pdfBuffer = await this.paymentsService.generatePaymentReceiptPDF(id);
+    const payment = await this.paymentsService.findPaymentById(id);
+
+    response.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="payment-receipt-${payment.reference}.pdf"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    response.send(pdfBuffer);
+  }
+
+  @Get('refunds/:refundId/receipt/pdf')
+  @ApiOperation({ summary: 'Generate PDF for refund receipt' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF generated successfully',
+    headers: {
+      'Content-Type': {
+        description: 'application/pdf',
+      },
+      'Content-Disposition': {
+        description: 'attachment; filename="refund-receipt-{reference}.pdf"',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Refund not found',
+  })
+  async generateRefundReceiptPDF(
+    @Param('refundId') refundId: string,
+    @Res() response: Response,
+  ) {
+    const pdfBuffer =
+      await this.paymentsService.generateRefundReceiptPDF(refundId);
+    const refund = await this.paymentsService.findRefundById(refundId);
+
+    response.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="refund-receipt-${refund.referenceNumber || refund.id}.pdf"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    response.send(pdfBuffer);
   }
 }

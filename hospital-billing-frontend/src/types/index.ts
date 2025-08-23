@@ -215,6 +215,8 @@ export const PaymentStatus = {
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
   CANCELLED: 'CANCELLED',
+  REFUND_REQUESTED: 'REFUND_REQUESTED',
+  REFUNDED: 'REFUNDED',
 } as const;
 
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];

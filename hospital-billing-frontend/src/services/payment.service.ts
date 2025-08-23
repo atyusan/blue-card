@@ -2,509 +2,351 @@ import { http } from './api';
 
 export interface Payment {
   id: string;
-  invoiceId: string;
-  invoice: {
-    id: string;
-    invoiceNumber: string;
-    patientName: string;
-    totalAmount: number;
-  };
-  amount: number;
-  paymentMethod:
-    | 'CASH'
-    | 'CARD'
-    | 'BANK_TRANSFER'
-    | 'MOBILE_MONEY'
-    | 'PAYSTACK'
-    | 'OTHER';
-  paymentDate: string;
   reference: string;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
-  processedBy: string;
-  processor: {
+  amount: number;
+  fee?: number;
+  method: string;
+  status: 'COMPLETED' | 'PENDING' | 'FAILED' | 'CANCELLED';
+  createdAt: Date;
+  processedAt?: Date;
+  processedBy?: string;
+  patientId: string;
+  invoiceId: string;
+  notes?: string;
+  patient?: {
     id: string;
     firstName: string;
     lastName: string;
+    patientId: string;
+    phone?: string;
+    email?: string;
   };
-  notes?: string;
-  transactionId?: string;
-  cardLast4?: string;
-  bankName?: string;
-  accountNumber?: string;
-  mobileMoneyProvider?: string;
-  phoneNumber?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreatePaymentData {
-  invoiceId: string;
-  amount: number;
-  paymentMethod:
-    | 'CASH'
-    | 'CARD'
-    | 'BANK_TRANSFER'
-    | 'MOBILE_MONEY'
-    | 'PAYSTACK'
-    | 'OTHER';
-  reference?: string;
-  notes?: string;
-  cardLast4?: string;
-  bankName?: string;
-  accountNumber?: string;
-  mobileMoneyProvider?: string;
-  phoneNumber?: string;
-}
-
-export interface UpdatePaymentData {
-  amount?: number;
-  paymentMethod?:
-    | 'CASH'
-    | 'CARD'
-    | 'BANK_TRANSFER'
-    | 'MOBILE_MONEY'
-    | 'PAYSTACK'
-    | 'OTHER';
-  reference?: string;
-  notes?: string;
-  status?: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  invoice?: {
+    id: string;
+    invoiceNumber?: string;
+    number?: string;
+    totalAmount: number;
+    balance?: number;
+    dueDate: Date;
+  };
 }
 
 export interface Refund {
   id: string;
-  paymentId: string;
-  payment: Payment;
+  reference: string;
+  originalPaymentId: string;
+  originalPaymentReference: string;
   amount: number;
   reason: string;
-  processedBy: string;
-  processor: {
+  status: 'COMPLETED' | 'PENDING' | 'FAILED' | 'CANCELLED';
+  method: string;
+  createdAt: Date;
+  processedAt?: Date;
+  processedBy?: string;
+  patientId: string;
+  notes?: string;
+  patient?: {
     id: string;
     firstName: string;
     lastName: string;
+    patientId: string;
+    phone?: string;
+    email?: string;
   };
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PROCESSED';
-  notes?: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  createdAt: string;
-  updatedAt: string;
+  originalPayment?: {
+    amount: number;
+    method: string;
+    reference: string;
+  };
 }
 
-export interface CreateRefundData {
+export interface ProcessPaymentData {
+  invoiceId: string;
+  patientId: string;
+  amount: number;
+  method: string;
+  reference?: string;
+  notes?: string;
+  processDate: string;
+  fee?: number;
+  feeType?: 'FIXED' | 'PERCENTAGE';
+  feeValue?: number;
+  sendReceipt?: boolean;
+  receiptEmail?: string;
+}
+
+export interface ProcessRefundData {
   paymentId: string;
   amount: number;
   reason: string;
+  method: string;
   notes?: string;
+  processDate: string;
 }
 
 export interface PaymentQueryParams {
   page?: number;
   limit?: number;
+  search?: string;
   status?: string;
   paymentMethod?: string;
+  dateRange?: string;
+  patientId?: string;
   invoiceId?: string;
-  startDate?: string;
-  endDate?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+export interface RefundQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  paymentMethod?: string;
+  dateRange?: string;
+  patientId?: string;
+  paymentId?: string;
 }
 
 class PaymentService {
-  // ===== PAYMENT MANAGEMENT =====
-
-  // Create new payment
-  async createPayment(paymentData: CreatePaymentData): Promise<Payment> {
-    const response = await http.post<Payment>('/payments', paymentData);
+  // Get payments with pagination and filters
+  async getPayments(params: PaymentQueryParams = {}): Promise<any> {
+    const response = await http.get('/payments', { params });
     return response;
   }
 
-  // Get all payments with pagination and filtering
-  async getPayments(
-    params: PaymentQueryParams = {}
-  ): Promise<PaginatedResponse<Payment>> {
-    const queryParams = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        queryParams.append(key, value.toString());
-      }
-    });
-
-    const response = await http.get<PaginatedResponse<Payment>>(
-      `/payments?${queryParams.toString()}`
-    );
-    return response;
+  // Get a single payment by ID
+  async getPayment(id: string): Promise<Payment> {
+    const response = await http.get(`/payments/${id}`);
+    return response as Payment;
   }
 
-  // Get payment by ID
-  async getPaymentById(id: string): Promise<Payment> {
-    const response = await http.get<Payment>(`/payments/${id}`);
-    return response;
+  // Process a new payment
+  async processPayment(data: ProcessPaymentData): Promise<Payment> {
+    const response = await http.post('/payments', data);
+    return response as Payment;
   }
 
-  // Update payment
-  async updatePayment(
+  // Update payment status
+  async updatePaymentStatus(
     id: string,
-    paymentData: UpdatePaymentData
+    status: string,
+    notes?: string
   ): Promise<Payment> {
-    const response = await http.patch<Payment>(`/payments/${id}`, paymentData);
+    const response = await http.patch(`/payments/${id}/status`, {
+      status,
+      notes,
+    });
+    return response as Payment;
+  }
+
+  // Cancel a payment
+  async cancelPayment(id: string, reason: string): Promise<Payment> {
+    const response = await http.post(`/payments/${id}/cancel`, { reason });
+    return response as Payment;
+  }
+
+  // Generate payment receipt PDF
+  async generateReceiptPDF(id: string): Promise<Blob> {
+    const response = await http.get(`/payments/${id}/receipt`, {
+      responseType: 'blob',
+    });
+    return response as Blob;
+  }
+
+  // Get refunds with pagination and filters
+  async getRefunds(params: RefundQueryParams = {}): Promise<any> {
+    const response = await http.get('/payments/refunds', { params });
     return response;
   }
 
-  // ===== REFUND MANAGEMENT =====
+  // Get a single refund by ID
+  async getRefund(id: string): Promise<Refund> {
+    const response = await http.get(`/refunds/${id}`);
+    return response as Refund;
+  }
 
-  // Create refund request
-  async createRefund(refundData: CreateRefundData): Promise<Refund> {
-    const response = await http.post<Refund>('/payments/refunds', refundData);
-    return response;
+  // Process a new refund
+  async processRefund(data: ProcessRefundData): Promise<Refund> {
+    const response = await http.post('/refunds', data);
+    return response as Refund;
   }
 
   // Approve refund
-  async approveRefund(refundId: string, approvedBy: string): Promise<Refund> {
-    const response = await http.post<Refund>(
-      `/payments/refunds/${refundId}/approve`,
-      {
-        approvedBy,
-      }
-    );
+  async approveRefund(id: string): Promise<Refund> {
+    const response = await http.post(`/payments/refunds/${id}/approve`);
+    return response as Refund;
+  }
+
+  // Update refund status (legacy method - keeping for backward compatibility)
+  async updateRefundStatus(
+    id: string,
+    status: string,
+    notes?: string
+  ): Promise<Refund> {
+    const response = await http.patch(`/refunds/${id}/status`, {
+      status,
+      notes,
+    });
+    return response as Refund;
+  }
+
+  // Cancel a refund
+  async cancelRefund(id: string, reason: string): Promise<Refund> {
+    const response = await http.post(`/refunds/${id}/cancel`, { reason });
+    return response as Refund;
+  }
+
+  // Get payment statistics
+  async getPaymentStats(dateRange?: string): Promise<any> {
+    const response = await http.get('/payments/stats', {
+      params: { dateRange },
+    });
+    return response;
+  }
+
+  // Get refund statistics
+  async getRefundStats(dateRange?: string): Promise<any> {
+    const response = await http.get('/refunds/stats', {
+      params: { dateRange },
+    });
+    return response;
+  }
+
+  // Export payments to CSV/Excel
+  async exportPayments(
+    params: PaymentQueryParams = {},
+    format: 'csv' | 'excel' = 'csv'
+  ): Promise<Blob> {
+    const response = await http.get('/payments/export', {
+      params: { ...params, format },
+      responseType: 'blob',
+    });
+    return response as Blob;
+  }
+
+  // Export refunds to CSV/Excel
+  async exportRefunds(
+    params: RefundQueryParams = {},
+    format: 'csv' | 'excel' = 'csv'
+  ): Promise<Blob> {
+    const response = await http.get('/refunds/export', {
+      params: { ...params, format },
+      responseType: 'blob',
+    });
+    return response as Blob;
+  }
+
+  // Bulk payment operations
+  async bulkUpdatePaymentStatus(
+    paymentIds: string[],
+    status: string,
+    notes?: string
+  ): Promise<any> {
+    const response = await http.post('/payments/bulk/status', {
+      paymentIds,
+      status,
+      notes,
+    });
+    return response;
+  }
+
+  // Bulk refund operations
+  async bulkUpdateRefundStatus(
+    refundIds: string[],
+    status: string,
+    notes?: string
+  ): Promise<any> {
+    const response = await http.post('/refunds/bulk/status', {
+      refundIds,
+      status,
+      notes,
+    });
+    return response;
+  }
+
+  // Get payment methods
+  async getPaymentMethods(): Promise<string[]> {
+    const response = await http.get('/payments/methods');
+    return response as string[];
+  }
+
+  // Validate payment reference
+  async validatePaymentReference(
+    reference: string
+  ): Promise<{ isValid: boolean; message: string }> {
+    const response = await http.post('/payments/validate-reference', {
+      reference,
+    });
+    return response as { isValid: boolean; message: string };
+  }
+
+  // Get payment history for a patient
+  async getPatientPaymentHistory(
+    patientId: string,
+    params: PaymentQueryParams = {}
+  ): Promise<any> {
+    const response = await http.get(`/patients/${patientId}/payments`, {
+      params,
+    });
+    return response;
+  }
+
+  // Get payment history for an invoice
+  async getInvoicePaymentHistory(
+    invoiceId: string,
+    params: PaymentQueryParams = {}
+  ): Promise<any> {
+    const response = await http.get(`/invoices/${invoiceId}/payments`, {
+      params,
+    });
+    return response;
+  }
+
+  // Generate payment receipt PDF
+  async generatePaymentReceiptPDF(id: string): Promise<Blob> {
+    const response = await http.get(`/payments/${id}/receipt/pdf`, {
+      responseType: 'blob',
+    });
+    return response as unknown as Blob;
+  }
+
+  // Generate refund receipt PDF
+  async generateRefundReceiptPDF(id: string): Promise<Blob> {
+    const response = await http.get(`/payments/refunds/${id}/receipt/pdf`, {
+      responseType: 'blob',
+    });
+    return response as unknown as Blob;
+  }
+
+  // Create refund
+  async createRefund(refundData: {
+    paymentId: string;
+    amount: number;
+    reason: string;
+    notes?: string;
+  }): Promise<any> {
+    const response = await http.post('/payments/refunds', refundData);
+    return response;
+  }
+
+  // Get refund by ID
+  async getRefundById(id: string): Promise<any> {
+    const response = await http.get(`/payments/refunds/${id}`);
     return response;
   }
 
   // Reject refund
-  async rejectRefund(
-    refundId: string,
-    rejectionData: { reason: string; rejectedBy: string }
-  ): Promise<Refund> {
-    const response = await http.post<Refund>(
-      `/payments/refunds/${refundId}/reject`,
-      rejectionData
-    );
-    return response;
-  }
-
-  // ===== ENHANCED FEATURES =====
-
-  // Verify payment before service
-  async verifyPayment(invoiceId: string): Promise<{
-    isVerified: boolean;
-    paymentStatus: string;
-    paidAmount: number;
-    outstandingAmount: number;
-    lastPaymentDate?: string;
-  }> {
-    const response = await http.get(`/payments/verify/${invoiceId}`);
-    return response as {
-      isVerified: boolean;
-      paymentStatus: string;
-      paidAmount: number;
-      outstandingAmount: number;
-      lastPaymentDate?: string;
-    };
-  }
-
-  // Get payment methods breakdown
-  async getPaymentMethodsBreakdown(): Promise<{
-    totalPayments: number;
-    byMethod: Record<
-      string,
-      { count: number; amount: number; percentage: number }
-    >;
-    byStatus: Record<
-      string,
-      { count: number; amount: number; percentage: number }
-    >;
-  }> {
-    const response = await http.get('/payments/methods-breakdown');
-    return response as {
-      totalPayments: number;
-      byMethod: Record<
-        string,
-        { count: number; amount: number; percentage: number }
-      >;
-      byStatus: Record<
-        string,
-        { count: number; amount: number; percentage: number }
-      >;
-    };
-  }
-
-  // Get reconciliation report
-  async getReconciliationReport(
-    startDate: string,
-    endDate: string
-  ): Promise<{
-    totalPayments: number;
-    totalRefunds: number;
-    netAmount: number;
-    byMethod: Record<
-      string,
-      { payments: number; refunds: number; net: number }
-    >;
-    byDay: Array<{
-      date: string;
-      payments: number;
-      refunds: number;
-      net: number;
-    }>;
-    discrepancies: Array<{
-      type: string;
-      description: string;
-      amount: number;
-      date: string;
-    }>;
-  }> {
-    const response = await http.get(
-      `/payments/reconciliation-report?startDate=${startDate}&endDate=${endDate}`
-    );
-    return response as {
-      totalPayments: number;
-      totalRefunds: number;
-      netAmount: number;
-      byMethod: Record<
-        string,
-        { payments: number; refunds: number; net: number }
-      >;
-      byDay: Array<{
-        date: string;
-        payments: number;
-        refunds: number;
-        net: number;
-      }>;
-      discrepancies: Array<{
-        type: string;
-        description: string;
-        amount: number;
-        date: string;
-      }>;
-    };
-  }
-
-  // Get payment analytics
-  async getPaymentAnalytics(
-    startDate: string,
-    endDate: string
-  ): Promise<{
-    totalRevenue: number;
-    totalPayments: number;
-    averagePaymentAmount: number;
-    paymentTrends: Array<{
-      date: string;
-      amount: number;
-      count: number;
-    }>;
-    topPaymentMethods: Array<{
-      method: string;
-      count: number;
-      amount: number;
-      percentage: number;
-    }>;
-    paymentSuccessRate: number;
-    refundRate: number;
-  }> {
-    const response = await http.get(
-      `/payments/analytics?startDate=${startDate}&endDate=${endDate}`
-    );
-    return response as {
-      totalRevenue: number;
-      totalPayments: number;
-      averagePaymentAmount: number;
-      paymentTrends: Array<{
-        date: string;
-        amount: number;
-        count: number;
-      }>;
-      topPaymentMethods: Array<{
-        method: string;
-        count: number;
-        amount: number;
-        percentage: number;
-      }>;
-      paymentSuccessRate: number;
-      refundRate: number;
-    };
-  }
-
-  // ===== ADDITIONAL FEATURES =====
-
-  // Get payment by invoice
-  async getPaymentsByInvoice(invoiceId: string): Promise<Payment[]> {
-    const response = await http.get<Payment[]>(
-      `/payments/invoice/${invoiceId}`
-    );
-    return response;
-  }
-
-  // Get payment by reference
-  async getPaymentByReference(reference: string): Promise<Payment> {
-    const response = await http.get<Payment>(
-      `/payments/reference/${reference}`
-    );
-    return response;
-  }
-
-  // Get payment statistics
-  async getPaymentStats(): Promise<{
-    totalPayments: number;
-    totalAmount: number;
-    paymentsByStatus: Record<string, { count: number; amount: number }>;
-    paymentsByMethod: Record<string, { count: number; amount: number }>;
-    todayPayments: { count: number; amount: number };
-    thisWeekPayments: { count: number; amount: number };
-    thisMonthPayments: { count: number; amount: number };
-  }> {
-    const response = await http.get('/payments/stats');
-    return response as {
-      totalPayments: number;
-      totalAmount: number;
-      paymentsByStatus: Record<string, { count: number; amount: number }>;
-      paymentsByMethod: Record<string, { count: number; amount: number }>;
-      todayPayments: { count: number; amount: number };
-      thisWeekPayments: { count: number; amount: number };
-      thisMonthPayments: { count: number; amount: number };
-    };
-  }
-
-  // Get payment history for patient
-  async getPatientPaymentHistory(patientId: string): Promise<Payment[]> {
-    const response = await http.get<Payment[]>(
-      `/payments/patient/${patientId}/history`
-    );
-    return response;
-  }
-
-  // Get payment history for user
-  async getUserPaymentHistory(userId: string): Promise<Payment[]> {
-    const response = await http.get<Payment[]>(
-      `/payments/user/${userId}/history`
-    );
-    return response;
-  }
-
-  // Export payment report
-  async exportPaymentReport(
-    params: PaymentQueryParams,
-    format: 'pdf' | 'csv' | 'excel'
-  ): Promise<Blob> {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        queryParams.append(key, value.toString());
-      }
+  async rejectRefund(id: string, rejectionReason?: string): Promise<any> {
+    // Use the new reject API endpoint with rejection reason
+    const response = await http.post(`/payments/refunds/${id}/reject`, {
+      rejectionReason: rejectionReason || 'Refund rejected by administrator',
     });
-    queryParams.append('format', format);
-
-    const response = await http.get(
-      `/payments/export?${queryParams.toString()}`,
-      {
-        responseType: 'blob',
-      }
-    );
-    return response as unknown as Blob;
+    return response;
   }
 
-  // Get payment methods
-  async getPaymentMethods(): Promise<
-    Array<{
-      method: string;
-      name: string;
-      isActive: boolean;
-      description?: string;
-      icon?: string;
-    }>
-  > {
-    const response = await http.get('/payments/methods');
-    return response as Array<{
-      method: string;
-      name: string;
-      isActive: boolean;
-      description?: string;
-      icon?: string;
-    }>;
-  }
-
-  // Get payment statuses
-  async getPaymentStatuses(): Promise<
-    Array<{
-      status: string;
-      name: string;
-      description: string;
-      color: string;
-    }>
-  > {
-    const response = await http.get('/payments/statuses');
-    return response as Array<{
-      status: string;
-      name: string;
-      description: string;
-      color: string;
-    }>;
-  }
-
-  // Process bulk payments
-  async processBulkPayments(
-    payments: Array<{
-      invoiceId: string;
-      amount: number;
-      paymentMethod: string;
-      reference?: string;
-    }>
-  ): Promise<{
-    successful: Payment[];
-    failed: Array<{ invoiceId: string; error: string }>;
-    totalProcessed: number;
-    totalSuccessful: number;
-    totalFailed: number;
-  }> {
-    const response = await http.post('/payments/bulk', { payments });
-    return response as {
-      successful: Payment[];
-      failed: Array<{ invoiceId: string; error: string }>;
-      totalProcessed: number;
-      totalSuccessful: number;
-      totalFailed: number;
-    };
-  }
-
-  // Get payment dashboard data
-  async getPaymentDashboardData(): Promise<{
-    recentPayments: Payment[];
-    pendingPayments: number;
-    todayRevenue: number;
-    weekRevenue: number;
-    monthRevenue: number;
-    paymentMethodsChart: Array<{
-      method: string;
-      amount: number;
-      percentage: number;
-    }>;
-    dailyRevenueChart: Array<{ date: string; revenue: number }>;
-  }> {
-    const response = await http.get('/payments/dashboard');
-    return response as {
-      recentPayments: Payment[];
-      pendingPayments: number;
-      todayRevenue: number;
-      weekRevenue: number;
-      monthRevenue: number;
-      paymentMethodsChart: Array<{
-        method: string;
-        amount: number;
-        percentage: number;
-      }>;
-      dailyRevenueChart: Array<{ date: string; revenue: number }>;
-    };
+  // Delete refund
+  async deleteRefund(id: string): Promise<any> {
+    const response = await http.delete(`/payments/refunds/${id}`);
+    return response;
   }
 }
 

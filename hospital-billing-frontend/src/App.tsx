@@ -27,6 +27,10 @@ import InvoiceDetailsPage from './pages/InvoiceDetailsPage';
 import InvoiceEditPage from './pages/InvoiceEditPage';
 import CreateInvoicePage from './pages/CreateInvoicePage';
 import BillingSettingsPage from './pages/BillingSettingsPage';
+import PaymentsPage from './pages/PaymentsPage';
+import ProcessPaymentPage from './pages/ProcessPaymentPage';
+import RefundsPage from './pages/RefundsPage';
+import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import Layout from './components/layout/Layout';
 
@@ -132,6 +136,15 @@ function App() {
 
                   {/* Appointments Routes */}
                   <Route path='appointments' element={<AppointmentsPage />} />
+
+                  {/* Payment Routes */}
+                  <Route path='payments' element={<PaymentsPage />} />
+                  <Route
+                    path='payments/process'
+                    element={<ProcessPaymentPage />}
+                  />
+                  <Route path='payments/refunds' element={<RefundsPage />} />
+                  <Route path='payments/:id' element={<PaymentDetailsPage />} />
 
                   {/* Add more routes here as we build them */}
                   <Route
