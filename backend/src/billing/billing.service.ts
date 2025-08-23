@@ -542,6 +542,47 @@ export class BillingService {
       },
     });
 
+    // Automatically create cash transaction record for cash payments
+    if (paymentData.method === 'CASH' && paymentData.processedBy) {
+      let cashierId = paymentData.processedBy;
+
+      const staff = await this.prisma.staffMember.findUnique({
+        where: { id: paymentData.processedBy },
+      });
+      if (staff) {
+        cashierId = staff.id;
+      } else {
+        const staff = await this.prisma.staffMember.findUnique({
+          where: { userId: paymentData.processedBy },
+        });
+
+        if (!staff) {
+          throw new NotFoundException('Staff member not found');
+        }
+
+        cashierId = staff.id;
+      }
+
+      try {
+        await this.prisma.cashTransaction.create({
+          data: {
+            cashierId,
+            patientId: invoice.patientId,
+            transactionType: 'CASH_IN',
+            amount: paymentData.amount,
+            description: `Cash payment for Invoice ${invoice.invoiceNumber || invoice.id.slice(-8)}`,
+            referenceNumber: paymentData.reference || `PAY-${Date.now()}`,
+            notes: `Automatic cash transaction for payment ID: ${payment.id}. ${paymentData.notes || ''}`,
+            status: 'COMPLETED',
+            transactionDate: new Date(),
+          },
+        });
+      } catch (error) {
+        // Don't fail the payment if cash transaction creation fails
+        // This ensures payment processing continues even if audit trail fails
+      }
+    }
+
     // Update invoice payment status
     const newPaidAmount = Number(invoice.paidAmount) + paymentData.amount;
     const newBalance = remainingBalance - paymentData.amount;

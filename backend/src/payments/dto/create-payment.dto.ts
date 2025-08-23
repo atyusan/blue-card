@@ -77,4 +77,13 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   transactionId?: string;
+
+  @ApiProperty({
+    description: 'ID of the staff member processing the payment',
+    example: 'clx1234567890abcdef',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  processedBy?: string;
 }

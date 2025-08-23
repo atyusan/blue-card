@@ -23,6 +23,7 @@ export class PaymentsService {
       paymentMethod,
       referenceNumber,
       notes,
+      processedBy,
     } = createPaymentDto;
 
     // Check if invoice exists
@@ -71,7 +72,7 @@ export class PaymentsService {
         reference: referenceNumber,
         notes,
         status: paymentStatus, // Set status based on payment method
-        processedBy: 'system', // TODO: Get from authenticated user
+        processedBy: processedBy || 'system', // Use provided processedBy or fallback to 'system'
         processedAt: new Date(),
       },
       include: {
@@ -96,6 +97,49 @@ export class PaymentsService {
 
     // Update patient account balance
     await this.updatePatientAccountBalance(patientId, amount);
+
+    // Automatically create cash transaction record for cash payments
+    if (paymentMethod === 'CASH' && processedBy) {
+      let cashierId = processedBy;
+
+      const staff = await this.prisma.staffMember.findUnique({
+        where: { id: processedBy },
+      });
+      if (staff) {
+        cashierId = staff.id;
+      } else {
+        const staff = await this.prisma.staffMember.findUnique({
+          where: { userId: processedBy },
+        });
+
+        if (!staff) {
+          throw new NotFoundException('Staff member not found');
+        }
+
+        cashierId = staff.id;
+      }
+
+      try {
+        await this.prisma.cashTransaction.create({
+          data: {
+            cashierId,
+            patientId: patientId,
+            transactionType: 'CASH_IN',
+            amount: amount,
+            description: `Cash payment for Invoice ${invoice.invoiceNumber || invoice.id.slice(-8)}`,
+            referenceNumber: referenceNumber || `PAY-${Date.now()}`,
+            notes: `Automatic cash transaction for payment ID: ${payment.id}. ${notes || ''}`,
+            status: 'COMPLETED',
+            transactionDate: new Date(),
+          },
+        });
+      } catch (error) {
+        console.error('Cash transaction creation failed', error);
+
+        // Don't fail the payment if cash transaction creation fails
+        // This ensures payment processing continues even if audit trail fails
+      }
+    }
 
     return payment;
   }
@@ -231,11 +275,6 @@ export class PaymentsService {
   async createRefund(refundData: CreateRefundDto) {
     const { paymentId, amount, reason, notes, referenceNumber } = refundData;
 
-    console.log(
-      '🔍 [PaymentsService.createRefund] Starting refund creation for payment:',
-      paymentId,
-    );
-
     // Check if payment exists
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -245,11 +284,6 @@ export class PaymentsService {
     if (!payment) {
       throw new NotFoundException('Payment not found');
     }
-
-    console.log(
-      '🔍 [PaymentsService.createRefund] Payment found with status:',
-      payment.status,
-    );
 
     // Check if payment can be refunded
     if (
@@ -266,8 +300,6 @@ export class PaymentsService {
       throw new ConflictException('Refund amount cannot exceed payment amount');
     }
 
-    console.log('🔍 [PaymentsService.createRefund] Creating refund record...');
-
     // Create refund
     const refund = await this.prisma.refund.create({
       data: {
@@ -282,33 +314,11 @@ export class PaymentsService {
       },
     });
 
-    console.log(
-      '🔍 [PaymentsService.createRefund] Refund created with ID:',
-      refund.id,
-    );
-
-    console.log(
-      '🔍 [PaymentsService.createRefund] Updating payment status to REFUND_REQUESTED...',
-    );
-
     // Update payment status to REFUND_REQUESTED
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: { status: 'REFUND_REQUESTED' },
     });
-
-    console.log(
-      '🔍 [PaymentsService.createRefund] Payment status updated to REFUND_REQUESTED',
-    );
-
-    // Verify the update
-    const updatedPayment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-    console.log(
-      '🔍 [PaymentsService.createRefund] Payment status after update:',
-      updatedPayment?.status,
-    );
 
     return refund;
   }
