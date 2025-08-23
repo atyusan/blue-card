@@ -47,6 +47,11 @@ model StaffMember {
   anesthesiologistSurgeries Surgery[]         @relation("Anesthesiologist")
   surgeries                 Surgery[]
 
+  // Cash Request Relations
+  cashRequestRequests   CashRequest[] @relation("CashRequestRequester")
+  cashRequestApprovals  CashRequest[] @relation("CashRequestApprover")
+  cashRequestRejections CashRequest[] @relation("CashRequestRejector")
+
   @@map("staff_members")
 }
 
@@ -514,6 +519,7 @@ model CashTransaction {
   id              String            @id @default(cuid())
   cashierId       String
   patientId       String?
+  cashRequestId   String? // Link to cash request if applicable
   transactionType TransactionType
   amount          Decimal           @db.Decimal(10, 2)
   description     String
@@ -525,8 +531,37 @@ model CashTransaction {
   updatedAt       DateTime          @updatedAt
   cashier         StaffMember       @relation(fields: [cashierId], references: [id])
   patient         Patient?          @relation(fields: [patientId], references: [id])
+  cashRequest     CashRequest?      @relation(fields: [cashRequestId], references: [id])
 
   @@map("cash_transactions")
+}
+
+model CashRequest {
+  id              String         @id @default(cuid())
+  requestNumber   String         @unique // Auto-generated: CR-YYYYMMDD-001
+  requesterId     String // Staff member requesting
+  department      String // Department making request
+  purpose         String // Reason for cash request
+  amount          Decimal        @db.Decimal(10, 2)
+  urgency         RequestUrgency @default(NORMAL)
+  status          RequestStatus  @default(PENDING)
+  approvedBy      String? // Cashier who approved
+  approvedAt      DateTime?
+  rejectionReason String?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  notes           String?
+  attachments     String[] // File paths/URLs
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  requester        StaffMember       @relation("CashRequestRequester", fields: [requesterId], references: [id])
+  approver         StaffMember?      @relation("CashRequestApprover", fields: [approvedBy], references: [id])
+  rejector         StaffMember?      @relation("CashRequestRejector", fields: [rejectedBy], references: [id])
+  cashTransactions CashTransaction[] // One request can have multiple transactions
+
+  @@map("cash_requests")
 }
 
 model PettyCash {
@@ -775,4 +810,19 @@ enum RefundStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum RequestUrgency {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
 }

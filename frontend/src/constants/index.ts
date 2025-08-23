@@ -410,6 +410,13 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
         permission: [UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.CASHIER],
       },
       {
+        id: 'cash-requests',
+        label: 'Cash Requests',
+        icon: 'RequestQuote',
+        path: '/cash-office/requests',
+        permission: [UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.CASHIER],
+      },
+      {
         id: 'petty-cash',
         label: 'Petty Cash',
         icon: 'BusinessCenter',

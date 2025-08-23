@@ -38,8 +38,34 @@ function generateUniqueUsername(firstName: string, lastName: string): string {
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  // Clear existing data
-  await clearDatabase();
+  // Check if --reset flag is provided
+  const shouldReset = process.argv.includes('--reset');
+
+  if (shouldReset) {
+    console.log('🔄 Reset mode detected - clearing existing data...');
+    // Clear existing data
+    await clearDatabase();
+  } else {
+    console.log(
+      '📝 Normal seeding mode - checking if database is already seeded...',
+    );
+
+    // Check if database is already seeded by looking for key data
+    const existingUsers = await prisma.user.count();
+    const existingPatients = await prisma.patient.count();
+    const existingServices = await prisma.service.count();
+
+    if (existingUsers > 0 && existingPatients > 0 && existingServices > 0) {
+      console.log('✅ Database appears to be already seeded with data');
+      console.log(`   - Users: ${existingUsers}`);
+      console.log(`   - Patients: ${existingPatients}`);
+      console.log(`   - Services: ${existingServices}`);
+      console.log('💡 Use "yarn seed:reset" to clear and reseed the database');
+      return;
+    }
+
+    console.log('📝 Database not fully seeded, proceeding with seeding...');
+  }
 
   // Seed data in order of dependencies
   await seedUsers();
@@ -59,6 +85,7 @@ async function main() {
   await seedMedicationInventory();
   await seedPrescriptions();
   await seedPrescriptionMedications();
+  await seedDispensedMedications();
   await seedSurgeries();
   await seedSurgicalProcedures();
   await seedOperatingRoomBookings();
@@ -68,6 +95,9 @@ async function main() {
   await seedRefunds();
   await seedCashTransactions();
   await seedPettyCash();
+  await seedCashRequests();
+  await seedPaystackCustomers();
+  await seedPaystackInvoices();
   await seedAuditLogs();
 
   console.log('✅ Database seeding completed successfully!');
@@ -78,6 +108,7 @@ async function main() {
 async function seedMedications() {
   console.log('💊 Seeding medications...');
 
+  const timestamp = Date.now().toString().slice(-6);
   const medications = [
     {
       name: 'Paracetamol',
@@ -85,7 +116,7 @@ async function seedMedications() {
       strength: '500mg',
       form: 'Tablet',
       manufacturer: 'ABC Pharmaceuticals',
-      drugCode: 'PARA500',
+      drugCode: `PARA500-${timestamp}`,
       category: 'Painkiller',
       controlledDrug: false,
       requiresPrescription: false,
@@ -96,7 +127,7 @@ async function seedMedications() {
       strength: '250mg',
       form: 'Capsule',
       manufacturer: 'XYZ Pharma',
-      drugCode: 'AMOX250',
+      drugCode: `AMOX250-${timestamp}`,
       category: 'Antibiotic',
       controlledDrug: false,
       requiresPrescription: true,
@@ -107,7 +138,7 @@ async function seedMedications() {
       strength: '400mg',
       form: 'Tablet',
       manufacturer: 'MedCorp',
-      drugCode: 'IBUP400',
+      drugCode: `IBUP400-${timestamp}`,
       category: 'Painkiller',
       controlledDrug: false,
       requiresPrescription: false,
@@ -118,7 +149,7 @@ async function seedMedications() {
       strength: '20mg',
       form: 'Capsule',
       manufacturer: 'HealthPharm',
-      drugCode: 'OMEP20',
+      drugCode: `OMEP20-${timestamp}`,
       category: 'Antacid',
       controlledDrug: false,
       requiresPrescription: true,
@@ -129,7 +160,7 @@ async function seedMedications() {
       strength: '10mg',
       form: 'Injection',
       manufacturer: 'Controlled Meds Inc',
-      drugCode: 'MORP10',
+      drugCode: `MORP10-${timestamp}`,
       category: 'Opioid',
       controlledDrug: true,
       requiresPrescription: true,
@@ -140,7 +171,7 @@ async function seedMedications() {
       strength: '5mg',
       form: 'Tablet',
       manufacturer: 'Anxiety Meds Ltd',
-      drugCode: 'DIAZ5',
+      drugCode: `DIAZ5-${timestamp}`,
       category: 'Benzodiazepine',
       controlledDrug: true,
       requiresPrescription: true,
@@ -202,6 +233,15 @@ async function seedMedicationInventory() {
 
 async function seedPatientAccounts() {
   console.log('💰 Seeding patient accounts...');
+
+  // Check if patient accounts already exist
+  const existingAccounts = await prisma.patientAccount.count();
+  if (existingAccounts > 0) {
+    console.log(
+      `⚠️  Patient accounts already exist (${existingAccounts}), skipping account creation`,
+    );
+    return;
+  }
 
   const patients = await prisma.patient.findMany();
 
@@ -520,6 +560,16 @@ async function clearDatabase() {
 
   // Delete in reverse order of dependencies with error handling
   try {
+    await prisma.cashRequest.deleteMany();
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table cash_requests doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during cash_requests deletion: ${error.message}`);
+    }
+  }
+
+  try {
     await prisma.pettyCash.deleteMany();
   } catch (error: any) {
     if (error.code === 'P2021') {
@@ -642,16 +692,6 @@ async function clearDatabase() {
   }
 
   try {
-    await prisma.medication.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(`⚠️  Table medications doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during medications deletion: ${error.message}`);
-    }
-  }
-
-  try {
     await prisma.prescriptionMedication.deleteMany();
   } catch (error: any) {
     if (error.code === 'P2021') {
@@ -662,6 +702,16 @@ async function clearDatabase() {
       console.log(
         `⚠️  Error during prescription_medications deletion: ${error.message}`,
       );
+    }
+  }
+
+  try {
+    await prisma.medication.deleteMany();
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table medications doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during medications deletion: ${error.message}`);
     }
   }
 
@@ -774,6 +824,16 @@ async function clearDatabase() {
   }
 
   try {
+    await prisma.auditLog.deleteMany();
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table audit_logs doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during audit_logs deletion: ${error.message}`);
+    }
+  }
+
+  try {
     await prisma.staffMember.deleteMany();
   } catch (error: any) {
     if (error.code === 'P2021') {
@@ -794,18 +854,45 @@ async function clearDatabase() {
   }
 
   try {
-    await prisma.auditLog.deleteMany();
+    await prisma.paystackInvoice.deleteMany();
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table audit_logs doesn't exist, skipping deletion`);
+      console.log(
+        `⚠️  Table paystack_invoices doesn't exist, skipping deletion`,
+      );
     } else {
-      console.log(`⚠️  Error during audit_logs deletion: ${error.message}`);
+      console.log(
+        `⚠️  Error during paystack_invoices deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.paystackCustomer.deleteMany();
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table paystack_customers doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during paystack_customers deletion: ${error.message}`,
+      );
     }
   }
 }
 
 async function seedUsers() {
   console.log('👥 Seeding users...');
+
+  // Check if users already exist
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log(
+      `⚠️  Users already exist (${existingUsers}), skipping user creation`,
+    );
+    return;
+  }
 
   const users = [
     {
@@ -875,6 +962,15 @@ async function seedUsers() {
 
 async function seedStaffMembers() {
   console.log('👨‍⚕️ Seeding staff members...');
+
+  // Check if staff members already exist
+  const existingStaff = await prisma.staffMember.count();
+  if (existingStaff > 0) {
+    console.log(
+      `⚠️  Staff members already exist (${existingStaff}), skipping staff creation`,
+    );
+    return;
+  }
 
   const admin = await prisma.user.findUnique({
     where: { email: 'admin@hospital.com' },
@@ -966,6 +1062,15 @@ async function seedStaffMembers() {
 
 async function seedPatients() {
   console.log('🏥 Seeding patients...');
+
+  // Check if patients already exist
+  const existingPatients = await prisma.patient.count();
+  if (existingPatients > 0) {
+    console.log(
+      `⚠️  Patients already exist (${existingPatients}), skipping patient creation`,
+    );
+    return;
+  }
 
   const patients = [
     {
@@ -1099,6 +1204,15 @@ async function seedPatients() {
 async function seedServiceCategories() {
   console.log('🏷️ Seeding service categories...');
 
+  // Check if service categories already exist
+  const existingCategories = await prisma.serviceCategory.count();
+  if (existingCategories > 0) {
+    console.log(
+      `⚠️  Service categories already exist (${existingCategories}), skipping category creation`,
+    );
+    return;
+  }
+
   const categories = [
     {
       name: 'Consultation',
@@ -1141,6 +1255,15 @@ async function seedServiceCategories() {
 
 async function seedServices() {
   console.log('🔧 Seeding services...');
+
+  // Check if services already exist
+  const existingServices = await prisma.service.count();
+  if (existingServices > 0) {
+    console.log(
+      `⚠️  Services already exist (${existingServices}), skipping service creation`,
+    );
+    return;
+  }
 
   const consultationCategory = await prisma.serviceCategory.findUnique({
     where: { name: 'Consultation' },
@@ -1774,6 +1897,227 @@ async function seedPettyCash() {
   }
 
   console.log('✅ Created petty cash request');
+}
+
+async function seedCashRequests() {
+  console.log('💰 Seeding cash requests...');
+
+  const staffMembers = await prisma.staffMember.findMany({
+    where: {
+      department: { in: ['Finance', 'Pharmacy', 'Laboratory', 'Emergency'] },
+    },
+    take: 4,
+  });
+
+  const cashier = await prisma.staffMember.findFirst({
+    where: { department: 'Finance' },
+  });
+
+  if (staffMembers.length > 0 && cashier) {
+    // Create cash requests based on available staff members
+    const cashRequests: Array<{
+      requesterId: string;
+      department: string;
+      purpose: string;
+      amount: number;
+      urgency: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+      status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+      notes: string;
+      attachments: string[];
+    }> = [];
+
+    if (staffMembers.length > 0) {
+      cashRequests.push({
+        requesterId: staffMembers[0].id,
+        department: staffMembers[0].department,
+        purpose: 'Computer equipment purchase',
+        amount: 250.0,
+        urgency: 'HIGH',
+        status: 'PENDING',
+        notes: 'Need to replace 2 broken laptops',
+        attachments: ['/uploads/quote1.pdf', '/uploads/quote2.pdf'],
+      });
+    }
+
+    if (staffMembers.length > 1) {
+      cashRequests.push({
+        requesterId: staffMembers[1].id,
+        department: staffMembers[1].department,
+        purpose: 'Plumbing supplies',
+        amount: 75.0,
+        urgency: 'NORMAL',
+        status: 'APPROVED',
+        notes: 'Regular maintenance supplies',
+        attachments: ['/uploads/supplies-list.pdf'],
+      });
+    }
+
+    if (staffMembers.length > 2) {
+      cashRequests.push({
+        requesterId: staffMembers[2].id,
+        department: staffMembers[2].department,
+        purpose: 'Medical supplies restock',
+        amount: 180.0,
+        urgency: 'URGENT',
+        status: 'PENDING',
+        notes: 'Critical supplies running low',
+        attachments: ['/uploads/inventory-report.pdf'],
+      });
+    }
+
+    if (staffMembers.length > 3) {
+      cashRequests.push({
+        requesterId: staffMembers[3].id,
+        department: staffMembers[3].department,
+        purpose: 'Office stationery',
+        amount: 45.0,
+        urgency: 'LOW',
+        status: 'APPROVED',
+        notes: 'Monthly office supplies',
+        attachments: [],
+      });
+    }
+
+    for (const requestData of cashRequests) {
+      const cashRequest = await prisma.cashRequest.create({
+        data: {
+          ...requestData,
+          requestNumber: `CR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(
+            Math.random() * 1000,
+          )
+            .toString()
+            .padStart(3, '0')}`,
+        },
+      });
+
+      // If the request is approved, create a cash transaction
+      if (requestData.status === 'APPROVED') {
+        await prisma.cashTransaction.create({
+          data: {
+            cashierId: cashier.id,
+            cashRequestId: cashRequest.id,
+            transactionType: TransactionType.CASH_OUT,
+            amount: requestData.amount,
+            description: `Cash disbursement for request ${cashRequest.requestNumber}: ${requestData.purpose}`,
+            referenceNumber: `CR-${cashRequest.requestNumber}`,
+            notes: `Approved cash request: ${requestData.purpose}`,
+            status: 'COMPLETED',
+          },
+        });
+      }
+    }
+
+    console.log(`✅ Created ${cashRequests.length} cash requests`);
+  } else {
+    console.log('⚠️ Skipping cash requests - insufficient staff members');
+  }
+}
+
+async function seedDispensedMedications() {
+  console.log('💊 Seeding dispensed medications...');
+
+  const prescriptionMedications = await prisma.prescriptionMedication.findMany({
+    take: 3,
+  });
+  const inventoryItems = await prisma.medicationInventory.findMany({ take: 3 });
+  const pharmacist = await prisma.staffMember.findFirst({
+    where: { department: 'Pharmacy' },
+  });
+
+  if (
+    prescriptionMedications.length > 0 &&
+    inventoryItems.length > 0 &&
+    pharmacist
+  ) {
+    for (
+      let i = 0;
+      i < Math.min(prescriptionMedications.length, inventoryItems.length);
+      i++
+    ) {
+      await prisma.dispensedMedication.create({
+        data: {
+          prescriptionMedicationId: prescriptionMedications[i].id,
+          inventoryItemId: inventoryItems[i].id,
+          quantity: 1,
+          dispensedBy: pharmacist.id,
+          dispensedAt: new Date(),
+          batchNumber: `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          notes: 'Medication dispensed as prescribed',
+        },
+      });
+    }
+
+    console.log(
+      `✅ Created ${Math.min(prescriptionMedications.length, inventoryItems.length)} dispensed medications`,
+    );
+  } else {
+    console.log('⚠️ Skipping dispensed medications - insufficient data');
+  }
+}
+
+async function seedPaystackCustomers() {
+  console.log('🏦 Seeding Paystack customers...');
+
+  const patients = await prisma.patient.findMany({ take: 3 });
+
+  for (const patient of patients) {
+    await prisma.paystackCustomer.create({
+      data: {
+        patientId: patient.id,
+        paystackCustomerId: `CUST_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        customerCode: `CUST_${patient.patientId.slice(-6)}`,
+        email:
+          patient.email || `patient.${patient.patientId.slice(-6)}@example.com`,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        phone: patient.phoneNumber,
+        metadata: {
+          patientId: patient.patientId,
+          registrationDate: patient.createdAt,
+        },
+      },
+    });
+  }
+
+  console.log(`✅ Created ${patients.length} Paystack customers`);
+}
+
+async function seedPaystackInvoices() {
+  console.log('🧾 Seeding Paystack invoices...');
+
+  const paystackCustomers = await prisma.paystackCustomer.findMany({ take: 2 });
+  const invoices = await prisma.invoice.findMany({ take: 2 });
+
+  if (paystackCustomers.length > 0 && invoices.length > 0) {
+    for (
+      let i = 0;
+      i < Math.min(paystackCustomers.length, invoices.length);
+      i++
+    ) {
+      await prisma.paystackInvoice.create({
+        data: {
+          localInvoiceId: invoices[i].id,
+          paystackCustomerId: paystackCustomers[i].id,
+          paystackInvoiceId: `INV_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          requestCode: `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          status: 'PENDING',
+          amount: invoices[i].totalAmount,
+          currency: 'NGN',
+          description: `Invoice ${invoices[i].invoiceNumber}`,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          hasInvoice: true,
+          invoiceNumber: invoices[i].invoiceNumber,
+        },
+      });
+    }
+
+    console.log(
+      `✅ Created ${Math.min(paystackCustomers.length, invoices.length)} Paystack invoices`,
+    );
+  } else {
+    console.log('⚠️ Skipping Paystack invoices - insufficient data');
+  }
 }
 
 main()

@@ -87,6 +87,7 @@ async function bootstrap() {
       'Cash Office Integration',
       'Cash office operations and reconciliation',
     )
+    .addTag('Cash Requests', 'Cash request management')
     .addTag('Paystack Integration', 'Paystack Terminal payment processing')
     .build();
 

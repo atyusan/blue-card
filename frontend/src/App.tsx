@@ -32,6 +32,8 @@ import ProcessPaymentPage from './pages/ProcessPaymentPage';
 import RefundsPage from './pages/RefundsPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
+import CashOfficeTransactionsPage from './pages/CashOfficeTransactionsPage';
+import CashRequestsPage from './pages/CashRequestsPage';
 import Layout from './components/layout/Layout';
 
 // Create a client
@@ -145,6 +147,16 @@ function App() {
                   />
                   <Route path='payments/refunds' element={<RefundsPage />} />
                   <Route path='payments/:id' element={<PaymentDetailsPage />} />
+
+                  {/* Cash Office Routes */}
+                  <Route
+                    path='cash-office/transactions'
+                    element={<CashOfficeTransactionsPage />}
+                  />
+                  <Route
+                    path='cash-office/requests'
+                    element={<CashRequestsPage />}
+                  />
 
                   {/* Add more routes here as we build them */}
                   <Route
