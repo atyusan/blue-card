@@ -24,6 +24,7 @@ import { SurgeryModule } from './surgery/surgery.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CashOfficeModule } from './cash-office/cash-office.module';
 import { CashRequestsModule } from './cash-requests/cash-requests.module';
+import { CashReportsModule } from './cash-reports/cash-reports.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PaystackModule } from './paystack/paystack.module';
 import { LoggingModule } from './logging/logging.module';
@@ -66,6 +67,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PaymentsModule,
     CashOfficeModule,
     CashRequestsModule,
+    CashReportsModule,
     ReportingModule,
     PaystackModule,
     DashboardModule,

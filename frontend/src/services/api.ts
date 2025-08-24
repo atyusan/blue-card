@@ -62,9 +62,9 @@ api.interceptors.response.use(
       removeLocalStorage(STORAGE_KEYS.AUTH_TOKEN);
       removeLocalStorage(STORAGE_KEYS.USER_DATA);
 
-      // Redirect to login page
-      window.location.href = '/login';
-      return Promise.reject(error);
+      // Don't redirect immediately, let the calling code handle it
+      // This allows React Query to properly handle the error
+      console.warn('Authentication required. Please login to continue.');
     }
 
     // Handle 403 Forbidden errors

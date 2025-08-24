@@ -50,6 +50,7 @@ import {
   Hotel,
   AccountBalance,
   ManageAccounts,
+  RequestQuote,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { NAVIGATION_ITEMS } from '../../constants';
@@ -247,6 +248,7 @@ const Layout: React.FC = () => {
       AccountBalance: <AccountBalance />,
       ManageAccounts: <ManageAccounts />,
       Notifications: <Notifications />,
+      RequestQuote: <RequestQuote />,
     };
     return iconMap[iconName] || <Dashboard />;
   };

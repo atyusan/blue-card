@@ -34,6 +34,7 @@ import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import CashOfficeTransactionsPage from './pages/CashOfficeTransactionsPage';
 import CashRequestsPage from './pages/CashRequestsPage';
+import CashReportsPage from './pages/CashReportsPage';
 import Layout from './components/layout/Layout';
 
 // Create a client
@@ -156,6 +157,10 @@ function App() {
                   <Route
                     path='cash-office/requests'
                     element={<CashRequestsPage />}
+                  />
+                  <Route
+                    path='cash-office/reports'
+                    element={<CashReportsPage />}
                   />
 
                   {/* Add more routes here as we build them */}
