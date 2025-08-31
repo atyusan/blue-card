@@ -18,12 +18,18 @@ import { UsersModule } from '../users/users.module';
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
           expiresIn: configService.get<string>('jwt.expiresIn') || '24h',
-          issuer: configService.get<string>('jwt.issuer') || 'hospital-billing-system',
-          audience: configService.get<string>('jwt.audience') || 'hospital-users',
+          issuer:
+            configService.get<string>('jwt.issuer') ||
+            'hospital-billing-system',
+          audience:
+            configService.get<string>('jwt.audience') || 'hospital-users',
         },
         verifyOptions: {
-          issuer: configService.get<string>('jwt.issuer') || 'hospital-billing-system',
-          audience: configService.get<string>('jwt.audience') || 'hospital-users',
+          issuer:
+            configService.get<string>('jwt.issuer') ||
+            'hospital-billing-system',
+          audience:
+            configService.get<string>('jwt.audience') || 'hospital-users',
         },
       }),
       inject: [ConfigService],

@@ -64,13 +64,27 @@ export class UsersController {
     required: false,
     description: 'Search by email, username, or name',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page (default: 50)',
+    example: 50,
+  })
   findAll(
     @Query('role') role?: string,
     @Query('isActive', new ParseBoolPipe({ optional: true }))
     isActive?: boolean,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.usersService.findAll({ role, isActive, search });
+    return this.usersService.findAll({ role, isActive, search, page, limit });
   }
 
   @Get(':id')

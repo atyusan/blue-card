@@ -29,6 +29,8 @@ import { ReportingModule } from './reporting/reporting.module';
 import { PaystackModule } from './paystack/paystack.module';
 import { LoggingModule } from './logging/logging.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,7 +54,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
       ],
       inject: [ConfigService],
     }),
-    LoggingModule,
+    // LoggingModule,
     DatabaseModule,
     AuthModule,
     UsersModule,
@@ -71,6 +73,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ReportingModule,
     PaystackModule,
     DashboardModule,
+    AppointmentsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -99,6 +99,16 @@ async function main() {
   await seedPaystackCustomers();
   await seedPaystackInvoices();
   await seedAuditLogs();
+  await seedAppointmentSlots();
+  await seedAppointments();
+  await seedNotificationTemplates();
+  await seedNotifications();
+  await seedProviderSchedules();
+  await seedProviderTimeOff();
+  await seedResources();
+  await seedResourceSchedules();
+  await seedPatientPreferences();
+  await seedWaitlistEntries();
 
   console.log('✅ Database seeding completed successfully!');
 }
@@ -234,61 +244,68 @@ async function seedMedicationInventory() {
 async function seedPatientAccounts() {
   console.log('💰 Seeding patient accounts...');
 
+  const patients = await prisma.patient.findMany();
+  const existingUsers = await prisma.user.findMany({
+    where: { role: 'PATIENT' },
+  });
+
+  if (patients.length === 0) {
+    console.log('⚠️ Skipping patient accounts - no patients found');
+    return;
+  }
+
   // Check if patient accounts already exist
-  const existingAccounts = await prisma.patientAccount.count();
-  if (existingAccounts > 0) {
+  const existingAccounts = await prisma.patientAccount.findMany();
+  if (existingAccounts.length > 0) {
     console.log(
-      `⚠️  Patient accounts already exist (${existingAccounts}), skipping account creation`,
+      `⚠️  Patient accounts already exist (${existingAccounts.length}), skipping account creation`,
     );
     return;
   }
 
-  const patients = await prisma.patient.findMany();
-
   for (const patient of patients) {
-    // Create patient account
-    await prisma.patientAccount.create({
+    // Check if user already exists for this patient
+    const existingUser = existingUsers.find(
+      (user) =>
+        user.email ===
+        `${patient.firstName.toLowerCase()}.${patient.lastName.toLowerCase()}@example.com`,
+    );
+
+    if (existingUser) {
+      console.log(
+        `⚠️  User already exists for patient ${patient.patientId}, skipping user creation`,
+      );
+      continue;
+    }
+
+    const tempPassword = generateTempPassword();
+    const user = await prisma.user.create({
       data: {
-        patientId: patient.id,
-        accountNumber: `ACC-${patient.patientId}-${Date.now()}`,
-        balance: Math.random() * 1000, // Random balance between 0-1000
-        creditLimit: 5000,
+        email: `${patient.firstName.toLowerCase()}.${patient.lastName.toLowerCase()}@example.com`,
+        username: patient.patientId.toLowerCase(),
+        password: tempPassword,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        role: 'PATIENT',
       },
     });
 
-    // Create user account for patients with emails
-    if (patient.email) {
-      const username = generateUniqueUsername(
-        patient.firstName,
-        patient.lastName,
-      );
-      const tempPassword = generateTempPassword();
+    await prisma.patientAccount.create({
+      data: {
+        patientId: patient.id,
+        accountNumber: `ACC${patient.patientId}`,
+        balance: 0,
+      },
+    });
 
-      const user = await prisma.user.create({
-        data: {
-          email: patient.email,
-          username,
-          password: await bcrypt.hash(tempPassword, 10),
-          firstName: patient.firstName,
-          lastName: patient.lastName,
-          role: UserRole.PATIENT,
-          isActive: true,
-        },
-      });
-
-      // Link patient to user
-      await prisma.patient.update({
-        where: { id: patient.id },
-        data: { userId: user.id },
-      });
-
-      console.log(
-        `👤 Created user account for patient ${patient.patientId} with temporary password: ${tempPassword}`,
-      );
-    }
+    console.log(
+      `👤 Created user account for patient ${patient.patientId} with temporary password: ${tempPassword}`,
+    );
   }
 
-  console.log(`✅ Created ${patients.length} patient accounts`);
+  const accounts = await prisma.patientAccount.findMany();
+  console.log(`✅ Created ${accounts.length} patient accounts`);
+  return accounts;
 }
 
 // ===== DAILY CHARGES SEEDING =====
@@ -558,43 +575,149 @@ async function seedAuditLogs() {
 async function clearDatabase() {
   console.log('🧹 Clearing existing data...');
 
-  // Delete in reverse order of dependencies with error handling
+  // Delete new appointment and notification related models first (due to foreign key constraints)
   try {
-    await prisma.cashRequest.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(`⚠️  Table cash_requests doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during cash_requests deletion: ${error.message}`);
-    }
-  }
-
-  try {
-    await prisma.pettyCash.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(`⚠️  Table petty_cash doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during petty_cash deletion: ${error.message}`);
-    }
-  }
-
-  try {
-    await prisma.cashTransaction.deleteMany();
+    await prisma.waitlistEntry.deleteMany();
+    console.log('✅ Deleted waitlist entries');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(
-        `⚠️  Table cash_transactions doesn't exist, skipping deletion`,
+        `⚠️  Table waitlist_entries doesn't exist, skipping deletion`,
       );
     } else {
       console.log(
-        `⚠️  Error during cash_transactions deletion: ${error.message}`,
+        `⚠️  Error during waitlist entries deletion: ${error.message}`,
       );
     }
   }
 
+  try {
+    await prisma.patientPreference.deleteMany();
+    console.log('✅ Deleted patient preferences');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table patient_preferences doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during patient preferences deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.resourceSchedule.deleteMany();
+    console.log('✅ Deleted resource schedules');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table resource_schedules doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during resource schedules deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.resource.deleteMany();
+    console.log('✅ Deleted resources');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table resources doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during resources deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.providerTimeOff.deleteMany();
+    console.log('✅ Deleted provider time off');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table provider_time_off doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during provider time off deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.providerSchedule.deleteMany();
+    console.log('✅ Deleted provider schedules');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table provider_schedules doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during provider schedules deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.notification.deleteMany();
+    console.log('✅ Deleted notifications');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table notifications doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during notifications deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.notificationTemplate.deleteMany();
+    console.log('✅ Deleted notification templates');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table notification_templates doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during notification templates deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.appointment.deleteMany();
+    console.log('✅ Deleted appointments');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table appointments doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during appointments deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.appointmentSlot.deleteMany();
+    console.log('✅ Deleted appointment slots');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table appointment_slots doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during appointment slots deletion: ${error.message}`,
+      );
+    }
+  }
+
+  // Continue with existing deletion order...
   try {
     await prisma.refund.deleteMany();
+    console.log('✅ Deleted refunds');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table refunds doesn't exist, skipping deletion`);
@@ -605,16 +728,83 @@ async function clearDatabase() {
 
   try {
     await prisma.payment.deleteMany();
+    console.log('✅ Deleted payments');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table payments doesn't exist, skipping deletion`);
-    } else {
       console.log(`⚠️  Error during payments deletion: ${error.message}`);
     }
   }
 
   try {
+    await prisma.paystackInvoice.deleteMany();
+    console.log('✅ Deleted Paystack invoices');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table paystack_invoices doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during Paystack invoices deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.paystackCustomer.deleteMany();
+    console.log('✅ Deleted Paystack customers');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table paystack_customers doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during Paystack customers deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.cashRequest.deleteMany();
+    console.log('✅ Deleted cash requests');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table cash_requests doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during cash requests deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.pettyCash.deleteMany();
+    console.log('✅ Deleted petty cash');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table petty_cash doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during petty cash deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.cashTransaction.deleteMany();
+    console.log('✅ Deleted cash transactions');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table cash_transactions doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during cash transactions deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
     await prisma.charge.deleteMany();
+    console.log('✅ Deleted charges');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table charges doesn't exist, skipping deletion`);
@@ -625,6 +815,7 @@ async function clearDatabase() {
 
   try {
     await prisma.invoice.deleteMany();
+    console.log('✅ Deleted invoices');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table invoices doesn't exist, skipping deletion`);
@@ -634,27 +825,38 @@ async function clearDatabase() {
   }
 
   try {
-    await prisma.dailyCharge.deleteMany();
+    await prisma.operatingRoomBooking.deleteMany();
+    console.log('✅ Deleted operating room bookings');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table daily_charges doesn't exist, skipping deletion`);
+      console.log(
+        `⚠️  Table operating_room_bookings doesn't exist, skipping deletion`,
+      );
     } else {
-      console.log(`⚠️  Error during daily_charges deletion: ${error.message}`);
+      console.log(
+        `⚠️  Error during operating room bookings deletion: ${error.message}`,
+      );
     }
   }
 
   try {
-    await prisma.admission.deleteMany();
+    await prisma.surgicalProcedure.deleteMany();
+    console.log('✅ Deleted surgical procedures');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table admissions doesn't exist, skipping deletion`);
+      console.log(
+        `⚠️  Table surgical_procedures doesn't exist, skipping deletion`,
+      );
     } else {
-      console.log(`⚠️  Error during admissions deletion: ${error.message}`);
+      console.log(
+        `⚠️  Error during surgical procedures deletion: ${error.message}`,
+      );
     }
   }
 
   try {
     await prisma.surgery.deleteMany();
+    console.log('✅ Deleted surgeries');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table surgeries doesn't exist, skipping deletion`);
@@ -665,6 +867,7 @@ async function clearDatabase() {
 
   try {
     await prisma.dispensedMedication.deleteMany();
+    console.log('✅ Deleted dispensed medications');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(
@@ -672,27 +875,14 @@ async function clearDatabase() {
       );
     } else {
       console.log(
-        `⚠️  Error during dispensed_medications deletion: ${error.message}`,
-      );
-    }
-  }
-
-  try {
-    await prisma.medicationInventory.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(
-        `⚠️  Table medication_inventory doesn't exist, skipping deletion`,
-      );
-    } else {
-      console.log(
-        `⚠️  Error during medication_inventory deletion: ${error.message}`,
+        `⚠️  Error during dispensed medications deletion: ${error.message}`,
       );
     }
   }
 
   try {
     await prisma.prescriptionMedication.deleteMany();
+    console.log('✅ Deleted prescription medications');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(
@@ -700,23 +890,14 @@ async function clearDatabase() {
       );
     } else {
       console.log(
-        `⚠️  Error during prescription_medications deletion: ${error.message}`,
+        `⚠️  Error during prescription medications deletion: ${error.message}`,
       );
     }
   }
 
   try {
-    await prisma.medication.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(`⚠️  Table medications doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during medications deletion: ${error.message}`);
-    }
-  }
-
-  try {
     await prisma.prescription.deleteMany();
+    console.log('✅ Deleted prescriptions');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table prescriptions doesn't exist, skipping deletion`);
@@ -726,37 +907,87 @@ async function clearDatabase() {
   }
 
   try {
+    await prisma.medicationInventory.deleteMany();
+    console.log('✅ Deleted medication inventory');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(
+        `⚠️  Table medication_inventory doesn't exist, skipping deletion`,
+      );
+    } else {
+      console.log(
+        `⚠️  Error during medication inventory deletion: ${error.message}`,
+      );
+    }
+  }
+
+  try {
+    await prisma.medication.deleteMany();
+    console.log('✅ Deleted medications');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table medications doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during medications deletion: ${error.message}`);
+    }
+  }
+
+  try {
     await prisma.labTest.deleteMany();
+    console.log('✅ Deleted lab tests');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table lab_tests doesn't exist, skipping deletion`);
     } else {
-      console.log(`⚠️  Error during lab_tests deletion: ${error.message}`);
+      console.log(`⚠️  Error during lab tests deletion: ${error.message}`);
     }
   }
 
   try {
     await prisma.labOrder.deleteMany();
+    console.log('✅ Deleted lab orders');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table lab_orders doesn't exist, skipping deletion`);
     } else {
-      console.log(`⚠️  Error during lab_orders deletion: ${error.message}`);
+      console.log(`⚠️  Error during lab orders deletion: ${error.message}`);
     }
   }
 
   try {
     await prisma.consultation.deleteMany();
+    console.log('✅ Deleted consultations');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table consultations doesn't exist, skipping deletion`);
-    } else {
       console.log(`⚠️  Error during consultations deletion: ${error.message}`);
     }
   }
 
   try {
+    await prisma.dailyCharge.deleteMany();
+    console.log('✅ Deleted daily charges');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table daily_charges doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during daily charges deletion: ${error.message}`);
+    }
+  }
+
+  try {
+    await prisma.admission.deleteMany();
+    console.log('✅ Deleted admissions');
+  } catch (error: any) {
+    if (error.code === 'P2021') {
+      console.log(`⚠️  Table admissions doesn't exist, skipping deletion`);
+    } else {
+      console.log(`⚠️  Error during admissions deletion: ${error.message}`);
+    }
+  }
+
+  try {
     await prisma.bed.deleteMany();
+    console.log('✅ Deleted beds');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(`⚠️  Table beds doesn't exist, skipping deletion`);
@@ -767,40 +998,36 @@ async function clearDatabase() {
 
   try {
     await prisma.ward.deleteMany();
+    console.log('✅ Deleted wards');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table wards doesn't exist, skipping deletion`);
-    } else {
       console.log(`⚠️  Error during wards deletion: ${error.message}`);
     }
   }
 
   try {
     await prisma.service.deleteMany();
+    console.log('✅ Deleted services');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table services doesn't exist, skipping deletion`);
-    } else {
       console.log(`⚠️  Error during services deletion: ${error.message}`);
     }
   }
 
   try {
     await prisma.serviceCategory.deleteMany();
+    console.log('✅ Deleted service categories');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(
-        `⚠️  Table service_categories doesn't exist, skipping deletion`,
-      );
-    } else {
-      console.log(
-        `⚠️  Error during service_categories deletion: ${error.message}`,
+        `⚠️  Error during service categories deletion: ${error.message}`,
       );
     }
   }
 
   try {
     await prisma.patientAccount.deleteMany();
+    console.log('✅ Deleted patient accounts');
   } catch (error: any) {
     if (error.code === 'P2021') {
       console.log(
@@ -808,76 +1035,55 @@ async function clearDatabase() {
       );
     } else {
       console.log(
-        `⚠️  Error during patient_accounts deletion: ${error.message}`,
+        `⚠️  Error during patient accounts deletion: ${error.message}`,
       );
     }
   }
 
   try {
     await prisma.patient.deleteMany();
+    console.log('✅ Deleted patients');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table patients doesn't exist, skipping deletion`);
-    } else {
       console.log(`⚠️  Error during patients deletion: ${error.message}`);
     }
   }
 
   try {
-    await prisma.auditLog.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(`⚠️  Table audit_logs doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during audit_logs deletion: ${error.message}`);
-    }
-  }
-
-  try {
     await prisma.staffMember.deleteMany();
+    console.log('✅ Deleted staff members');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table staff_members doesn't exist, skipping deletion`);
-    } else {
-      console.log(`⚠️  Error during staff_members deletion: ${error.message}`);
+      console.log(`⚠️  Error during staff members deletion: ${error.message}`);
     }
   }
 
   try {
     await prisma.user.deleteMany();
+    console.log('✅ Deleted users');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(`⚠️  Table users doesn't exist, skipping deletion`);
+      console.log(`⚠️  Error during users deletion: ${error.message}`);
+    } else if (error.code === 'P2003') {
+      console.log(
+        `⚠️  Foreign key constraint prevents user deletion. Some users may have active relationships.`,
+      );
+      console.log(
+        `⚠️  This is expected behavior - the seeding will continue with existing users.`,
+      );
     } else {
       console.log(`⚠️  Error during users deletion: ${error.message}`);
     }
   }
 
   try {
-    await prisma.paystackInvoice.deleteMany();
+    await prisma.auditLog.deleteMany();
+    console.log('✅ Deleted audit logs');
   } catch (error: any) {
     if (error.code === 'P2021') {
-      console.log(
-        `⚠️  Table paystack_invoices doesn't exist, skipping deletion`,
-      );
+      console.log(`⚠️  Table audit_logs doesn't exist, skipping deletion`);
     } else {
-      console.log(
-        `⚠️  Error during paystack_invoices deletion: ${error.message}`,
-      );
-    }
-  }
-
-  try {
-    await prisma.paystackCustomer.deleteMany();
-  } catch (error: any) {
-    if (error.code === 'P2021') {
-      console.log(
-        `⚠️  Table paystack_customers doesn't exist, skipping deletion`,
-      );
-    } else {
-      console.log(
-        `⚠️  Error during paystack_customers deletion: ${error.message}`,
-      );
+      console.log(`⚠️  Error during audit logs deletion: ${error.message}`);
     }
   }
 }
@@ -2118,6 +2324,734 @@ async function seedPaystackInvoices() {
   } else {
     console.log('⚠️ Skipping Paystack invoices - insufficient data');
   }
+}
+
+async function seedAppointmentSlots() {
+  console.log('🌅 Seeding appointment slots...');
+
+  // Get staff members (these are the only ones that can have slots in current schema)
+  const staffDoctors = await prisma.staffMember.findMany({
+    take: 5, // Increased to get more doctors
+    include: {
+      user: true, // Include the user data
+    },
+  });
+
+  // Note: User doctors cannot have slots in current schema - only StaffMember can
+  console.log(
+    '⚠️  Note: Only StaffMember doctors can have appointment slots in current schema',
+  );
+  console.log(
+    '⚠️  User doctors with DOCTOR role cannot have slots until schema is updated',
+  );
+
+  const allDoctors = staffDoctors; // Only use staff doctors for now
+
+  if (allDoctors.length === 0) {
+    console.log('⚠️ Skipping appointment slots - no doctors found');
+    return;
+  }
+
+  console.log(
+    `📋 Found ${staffDoctors.length} staff doctors (only these can have slots in current schema)`,
+  );
+
+  // Log the specific doctors that will get slots
+  console.log('🏥 Staff Doctors (will get slots):');
+  staffDoctors.forEach((doctor, index) => {
+    console.log(
+      `  ${index + 1}. ${doctor.user.firstName} ${doctor.user.lastName} (ID: ${doctor.id})`,
+    );
+  });
+
+  const slots: any[] = [];
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const dayAfterTomorrow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Create slots for tomorrow
+  for (const doctor of allDoctors) {
+    console.log(`📅 Creating slots for doctor ID: ${doctor.id} (tomorrow)`);
+    for (let hour = 9; hour <= 16; hour++) {
+      if (hour === 12) continue; // Skip lunch hour
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(tomorrow.getTime() + hour * 60 * 60 * 1000),
+            endTime: new Date(
+              tomorrow.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(
+              tomorrow.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            endTime: new Date(tomorrow.getTime() + (hour + 1) * 60 * 60 * 1000),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+    }
+  }
+
+  // Create slots for next week
+  for (const doctor of allDoctors) {
+    for (let hour = 9; hour <= 16; hour++) {
+      if (hour === 12) continue; // Skip lunch hour
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(nextWeek.getTime() + hour * 60 * 60 * 1000),
+            endTime: new Date(
+              nextWeek.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(
+              nextWeek.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            endTime: new Date(nextWeek.getTime() + (hour + 1) * 60 * 60 * 1000),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+    }
+  }
+
+  // Create slots for day after tomorrow
+  for (const doctor of allDoctors) {
+    for (let hour = 9; hour <= 16; hour++) {
+      if (hour === 12) continue; // Skip lunch hour
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(
+              dayAfterTomorrow.getTime() + hour * 60 * 60 * 1000,
+            ),
+            endTime: new Date(
+              dayAfterTomorrow.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+      slots.push(
+        prisma.appointmentSlot.create({
+          data: {
+            providerId: doctor.id,
+            startTime: new Date(
+              dayAfterTomorrow.getTime() + (hour + 0.5) * 60 * 60 * 1000,
+            ),
+            endTime: new Date(
+              dayAfterTomorrow.getTime() + (hour + 1) * 60 * 60 * 1000,
+            ),
+            duration: 30,
+            slotType: 'CONSULTATION',
+            isAvailable: true,
+            isBookable: true,
+            maxBookings: 1,
+            currentBookings: 0,
+            bufferTimeBefore: 0,
+            bufferTimeAfter: 0,
+            specialty: 'General Medicine',
+          },
+        }),
+      );
+    }
+  }
+
+  const createdSlots = await Promise.all(slots);
+  console.log(
+    `✅ Created ${createdSlots.length} appointment slots for ${allDoctors.length} doctors`,
+  );
+  return createdSlots;
+}
+
+async function seedAppointments() {
+  console.log('📅 Seeding appointments...');
+
+  const patients = await prisma.patient.findMany({ take: 5 });
+  const slots = await prisma.appointmentSlot.findMany({ take: 10 });
+  const doctors = await prisma.staffMember.findMany({
+    take: 2,
+  });
+
+  if (patients.length === 0 || slots.length === 0 || doctors.length === 0) {
+    console.log('⚠️ Skipping appointments - insufficient data');
+    return;
+  }
+
+  const appointments: any[] = [];
+  const appointmentTypes: Array<
+    | 'GENERAL_CONSULTATION'
+    | 'SPECIALIST_CONSULTATION'
+    | 'LAB_TEST'
+    | 'IMAGING'
+    | 'SURGERY'
+    | 'FOLLOW_UP'
+    | 'EMERGENCY'
+    | 'TELEMEDICINE'
+    | 'PREVENTIVE_CARE'
+  > = ['GENERAL_CONSULTATION', 'FOLLOW_UP', 'EMERGENCY', 'PREVENTIVE_CARE'];
+  const priorities: Array<
+    'ROUTINE' | 'URGENT' | 'EMERGENCY' | 'VIP' | 'FOLLOW_UP'
+  > = ['ROUTINE', 'URGENT', 'EMERGENCY', 'FOLLOW_UP'];
+  const statuses: Array<
+    | 'SCHEDULED'
+    | 'CONFIRMED'
+    | 'CHECKED_IN'
+    | 'IN_PROGRESS'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'NO_SHOW'
+    | 'RESCHEDULED'
+  > = ['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED'];
+
+  for (let i = 0; i < Math.min(patients.length, slots.length); i++) {
+    const slot = slots[i];
+    const patient = patients[i];
+    const doctor = doctors[i % doctors.length];
+    const status = statuses[i % statuses.length];
+    const appointmentType = appointmentTypes[i % appointmentTypes.length];
+    const priority = priorities[i % priorities.length];
+
+    appointments.push(
+      prisma.appointment.create({
+        data: {
+          patientId: patient.id,
+          slotId: slot.id,
+          providerId: doctor.id,
+          status,
+          appointmentType,
+          priority,
+          reason: `Appointment for ${appointmentType.toLowerCase()}`,
+          symptoms:
+            i % 2 === 0 ? 'General consultation needed' : 'Follow-up required',
+          notes: `Seeded appointment ${i + 1}`,
+          totalAmount: 5000 + i * 1000,
+          balance: 5000 + i * 1000,
+          requiresPrePayment: i % 3 !== 0,
+          scheduledStart: slot.startTime,
+          scheduledEnd: slot.endTime,
+        },
+      }),
+    );
+  }
+
+  const createdAppointments = await Promise.all(appointments);
+  console.log(`✅ Created ${createdAppointments.length} appointments`);
+  return createdAppointments;
+}
+
+async function seedNotificationTemplates() {
+  console.log('📧 Seeding notification templates...');
+
+  const templates = [
+    {
+      name: 'Appointment Confirmation',
+      subject: 'Appointment Confirmed - {appointmentDate}',
+      content:
+        'Dear {patientName}, your appointment with Dr. {providerName} has been confirmed for {appointmentDate} at {appointmentTime}. Please arrive 15 minutes early.',
+      channel: 'EMAIL' as const,
+      type: 'APPOINTMENT_CONFIRMATION',
+      isActive: true,
+      variables: [
+        'patientName',
+        'providerName',
+        'appointmentDate',
+        'appointmentTime',
+      ],
+    },
+    {
+      name: 'Appointment Reminder',
+      subject: 'Reminder: Appointment Tomorrow at {appointmentTime}',
+      content:
+        'Hi {patientName}, this is a reminder for your appointment with Dr. {providerName} tomorrow at {appointmentTime}. Please confirm your attendance.',
+      channel: 'SMS' as const,
+      type: 'APPOINTMENT_REMINDER',
+      isActive: true,
+      variables: ['patientName', 'providerName', 'appointmentTime'],
+    },
+    {
+      name: 'Payment Due',
+      subject: 'Payment Due for Appointment - {appointmentDate}',
+      content:
+        'Dear {patientName}, payment of {amount} is due for your appointment on {appointmentDate}. Please complete payment before your visit.',
+      channel: 'EMAIL' as const,
+      type: 'PAYMENT_REMINDER',
+      isActive: true,
+      variables: ['patientName', 'amount', 'appointmentDate'],
+    },
+    {
+      name: 'Appointment Cancelled',
+      subject: 'Appointment Cancelled - {appointmentDate}',
+      content:
+        'Dear {patientName}, your appointment with Dr. {providerName} on {appointmentDate} has been cancelled. Please contact us to reschedule.',
+      channel: 'SMS' as const,
+      type: 'APPOINTMENT_CANCELLATION',
+      isActive: true,
+      variables: ['patientName', 'providerName', 'appointmentDate'],
+    },
+    {
+      name: 'Welcome Message',
+      subject: 'Welcome to Our Healthcare Facility',
+      content:
+        'Welcome {patientName}! Thank you for choosing our healthcare facility. We look forward to providing you with excellent care.',
+      channel: 'EMAIL' as const,
+      type: 'GENERAL_ANNOUNCEMENT',
+      isActive: true,
+      variables: ['patientName'],
+    },
+  ];
+
+  const createdTemplates = await Promise.all(
+    templates.map((template) =>
+      prisma.notificationTemplate.create({ data: template }),
+    ),
+  );
+
+  console.log(`✅ Created ${createdTemplates.length} notification templates`);
+  return createdTemplates;
+}
+
+async function seedNotifications() {
+  console.log('🔔 Seeding notifications...');
+
+  const patients = await prisma.patient.findMany({ take: 5 });
+  const doctors = await prisma.staffMember.findMany({
+    take: 2,
+  });
+  const templates = await prisma.notificationTemplate.findMany({ take: 3 });
+  const appointments = await prisma.appointment.findMany({ take: 5 });
+
+  if (patients.length === 0 || templates.length === 0) {
+    console.log('⚠️ Skipping notifications - insufficient data');
+    return;
+  }
+
+  const notifications: any[] = [];
+  const channels: Array<'EMAIL' | 'SMS' | 'PUSH_NOTIFICATION' | 'IN_APP'> = [
+    'EMAIL',
+    'SMS',
+    'PUSH_NOTIFICATION',
+    'IN_APP',
+  ];
+  const types: Array<
+    | 'APPOINTMENT_CONFIRMATION'
+    | 'APPOINTMENT_REMINDER'
+    | 'PAYMENT_REMINDER'
+    | 'GENERAL_ANNOUNCEMENT'
+  > = [
+    'APPOINTMENT_CONFIRMATION',
+    'APPOINTMENT_REMINDER',
+    'PAYMENT_REMINDER',
+    'GENERAL_ANNOUNCEMENT',
+  ];
+  const priorities: Array<'NORMAL' | 'HIGH' | 'URGENT'> = [
+    'NORMAL',
+    'HIGH',
+    'URGENT',
+  ];
+  const statuses: Array<'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | 'READ'> =
+    ['PENDING', 'SENT', 'DELIVERED', 'FAILED', 'READ'];
+
+  for (let i = 0; i < Math.min(patients.length * 2, 20); i++) {
+    const patient = patients[i % patients.length];
+    const template = templates[i % templates.length];
+    const channel = channels[i % channels.length];
+    const type = types[i % types.length];
+    const priority = priorities[i % priorities.length];
+    const status = statuses[i % statuses.length];
+
+    const sentAt =
+      status === 'PENDING'
+        ? null
+        : new Date(Date.now() - i * 2 * 60 * 60 * 1000);
+
+    notifications.push(
+      prisma.notification.create({
+        data: {
+          recipientId: patient.id,
+          recipientType: 'PATIENT',
+          subject: `Test ${type} notification ${i + 1}`,
+          content: `This is a test ${type.toLowerCase()} notification for ${patient.firstName} ${patient.lastName}.`,
+          channel,
+          type,
+          priority,
+          status,
+          sentAt,
+          scheduledFor:
+            status === 'PENDING'
+              ? new Date(Date.now() + (i + 1) * 60 * 60 * 1000)
+              : null,
+          metadata: {
+            templateId: template.id,
+            appointmentId: appointments[i % appointments.length]?.id,
+            testData: true,
+          },
+        },
+      }),
+    );
+  }
+
+  // Add some staff notifications
+  for (let i = 0; i < Math.min(doctors.length, 3); i++) {
+    const doctor = doctors[i];
+    const template = templates[i % templates.length];
+
+    notifications.push(
+      prisma.notification.create({
+        data: {
+          recipientId: doctor.id,
+          recipientType: 'STAFF',
+          subject: `New Appointment Scheduled - ${new Date().toLocaleDateString()}`,
+          content: `Dr. ${doctor.employeeId}, you have new appointments scheduled for today.`,
+          channel: 'IN_APP',
+          type: 'APPOINTMENT_CONFIRMATION',
+          priority: 'NORMAL',
+          status: 'READ',
+          sentAt: new Date(Date.now() - (i + 1) * 60 * 60 * 1000),
+          metadata: {
+            templateId: template.id,
+            testData: true,
+          },
+        },
+      }),
+    );
+  }
+
+  const createdNotifications = await Promise.all(notifications);
+  console.log(`✅ Created ${createdNotifications.length} notifications`);
+  return createdNotifications;
+}
+
+async function seedProviderSchedules() {
+  console.log('📋 Seeding provider schedules...');
+
+  const doctors = await prisma.staffMember.findMany({
+    take: 3,
+  });
+
+  if (doctors.length === 0) {
+    console.log('⚠️ Skipping provider schedules - no doctors found');
+    return;
+  }
+
+  const schedules: any[] = [];
+  const daysOfWeek = [1, 2, 3, 4, 5]; // Monday to Friday
+
+  for (const doctor of doctors) {
+    for (const day of daysOfWeek) {
+      schedules.push(
+        prisma.providerSchedule.create({
+          data: {
+            providerId: doctor.id,
+            dayOfWeek: day,
+            startTime: '09:00',
+            endTime: '17:00',
+            isAvailable: true,
+            maxAppointments: 16,
+            breakStart: '12:00',
+            breakEnd: '13:00',
+            slotDuration: 30,
+            bufferTime: 15,
+          },
+        }),
+      );
+    }
+  }
+
+  const createdSchedules = await Promise.all(schedules);
+  console.log(`✅ Created ${createdSchedules.length} provider schedules`);
+  return createdSchedules;
+}
+
+async function seedProviderTimeOff() {
+  console.log('🏖️ Seeding provider time off...');
+
+  const doctors = await prisma.staffMember.findMany({
+    take: 2,
+  });
+
+  if (doctors.length === 0) {
+    console.log('⚠️ Skipping provider time off - no doctors found');
+    return;
+  }
+
+  const timeOff = [
+    {
+      providerId: doctors[0].id,
+      startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Next week
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      reason: 'Personal leave',
+      type: 'PERSONAL_LEAVE' as const,
+      status: 'APPROVED' as const,
+    },
+    {
+      providerId: doctors[1].id,
+      startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 2 weeks from now
+      endDate: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000), // 2 weeks + 2 days
+      reason: 'Conference attendance',
+      type: 'CONFERENCE' as const,
+      status: 'APPROVED' as const,
+    },
+  ];
+
+  const createdTimeOff = await Promise.all(
+    timeOff.map((record) => prisma.providerTimeOff.create({ data: record })),
+  );
+
+  console.log(`✅ Created ${createdTimeOff.length} provider time off records`);
+  return createdTimeOff;
+}
+
+async function seedResources() {
+  console.log('🏥 Seeding resources...');
+
+  const resources = [
+    {
+      name: 'Consultation Room 1',
+      type: 'CONSULTATION_ROOM' as const,
+      capacity: 1,
+      isActive: true,
+      location: 'Ground Floor, Wing A',
+      notes: 'Standard consultation room with examination table',
+    },
+    {
+      name: 'Consultation Room 2',
+      type: 'CONSULTATION_ROOM' as const,
+      capacity: 1,
+      isActive: true,
+      location: 'Ground Floor, Wing A',
+      notes: 'Standard consultation room with examination table',
+    },
+    {
+      name: 'X-Ray Machine',
+      type: 'EQUIPMENT' as const,
+      capacity: 1,
+      isActive: true,
+      location: 'First Floor, Imaging Department',
+      notes: 'Digital X-ray machine for diagnostic imaging',
+    },
+    {
+      name: 'Ultrasound Machine',
+      type: 'EQUIPMENT' as const,
+      capacity: 1,
+      isActive: true,
+      location: 'First Floor, Imaging Department',
+      notes: 'Portable ultrasound machine for diagnostic imaging',
+    },
+  ];
+
+  const createdResources = await Promise.all(
+    resources.map((resource) => prisma.resource.create({ data: resource })),
+  );
+
+  console.log(`✅ Created ${createdResources.length} resources`);
+  return createdResources;
+}
+
+async function seedResourceSchedules() {
+  console.log('📅 Seeding resource schedules...');
+
+  const resources = await prisma.resource.findMany({ take: 4 });
+
+  if (resources.length === 0) {
+    console.log('⚠️ Skipping resource schedules - no resources found');
+    return;
+  }
+
+  const schedules: any[] = [];
+  const daysOfWeek = [1, 2, 3, 4, 5]; // Monday to Friday
+
+  for (const resource of resources) {
+    for (const day of daysOfWeek) {
+      schedules.push(
+        prisma.resourceSchedule.create({
+          data: {
+            resourceId: resource.id,
+            dayOfWeek: day,
+            startTime: '09:00',
+            endTime: '17:00',
+            isAvailable: true,
+          },
+        }),
+      );
+    }
+  }
+
+  const createdSchedules = await Promise.all(schedules);
+  console.log(`✅ Created ${createdSchedules.length} resource schedules`);
+  return createdSchedules;
+}
+
+async function seedPatientPreferences() {
+  console.log('⚙️ Seeding patient preferences...');
+
+  const patients = await prisma.patient.findMany({ take: 5 });
+
+  if (patients.length === 0) {
+    console.log('⚠️ Skipping patient preferences - no patients found');
+    return;
+  }
+
+  const preferences: any[] = [];
+  const preferenceTypes: Array<
+    | 'PROVIDER_PREFERENCE'
+    | 'TIME_PREFERENCE'
+    | 'LOCATION_PREFERENCE'
+    | 'COMMUNICATION_PREFERENCE'
+    | 'SPECIAL_NEEDS'
+  > = [
+    'PROVIDER_PREFERENCE',
+    'TIME_PREFERENCE',
+    'LOCATION_PREFERENCE',
+    'COMMUNICATION_PREFERENCE',
+    'SPECIAL_NEEDS',
+  ];
+  const preferenceValues = {
+    PROVIDER_PREFERENCE: ['Dr. Smith', 'Dr. Johnson', 'Dr. Brown'],
+    TIME_PREFERENCE: ['MORNING', 'AFTERNOON', 'EVENING'],
+    LOCATION_PREFERENCE: ['Main Building', 'Wing A', 'Wing B'],
+    COMMUNICATION_PREFERENCE: ['EMAIL', 'SMS', 'PHONE'],
+    SPECIAL_NEEDS: ['Wheelchair Access', 'Sign Language', 'None'],
+  };
+
+  for (const patient of patients) {
+    for (const type of preferenceTypes) {
+      const values = preferenceValues[type as keyof typeof preferenceValues];
+      const value = values[Math.floor(Math.random() * values.length)];
+
+      preferences.push(
+        prisma.patientPreference.create({
+          data: {
+            patientId: patient.id,
+            preferenceType: type,
+            preferenceValue: value,
+            isActive: Math.random() > 0.3, // 70% active
+          },
+        }),
+      );
+    }
+  }
+
+  const createdPreferences = await Promise.all(preferences);
+  console.log(`✅ Created ${createdPreferences.length} patient preferences`);
+  return createdPreferences;
+}
+
+async function seedWaitlistEntries() {
+  console.log('⏳ Seeding waitlist entries...');
+
+  const patients = await prisma.patient.findMany({ take: 3 });
+  const appointments = await prisma.appointment.findMany({ take: 3 });
+  const doctors = await prisma.staffMember.findMany({
+    take: 2,
+  });
+
+  if (
+    patients.length === 0 ||
+    appointments.length === 0 ||
+    doctors.length === 0
+  ) {
+    console.log('⚠️ Skipping waitlist entries - insufficient data');
+    return;
+  }
+
+  const waitlistEntries: any[] = [];
+  const priorities: Array<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'> = [
+    'LOW',
+    'NORMAL',
+    'HIGH',
+    'URGENT',
+  ];
+  const statuses: Array<'ACTIVE' | 'FILLED' | 'CANCELLED' | 'EXPIRED'> = [
+    'ACTIVE',
+    'FILLED',
+    'CANCELLED',
+    'EXPIRED',
+  ];
+
+  // Create one waitlist entry per appointment (due to unique constraint)
+  for (let i = 0; i < Math.min(appointments.length, 3); i++) {
+    const appointment = appointments[i];
+    const patient = patients[i % patients.length];
+    const priority = priorities[i % priorities.length];
+    const status = statuses[i % statuses.length];
+
+    waitlistEntries.push(
+      prisma.waitlistEntry.create({
+        data: {
+          patientId: patient.id,
+          appointmentId: appointment.id,
+          requestedDate: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000),
+          preferredTimeSlots: ['09:00', '14:00', '16:00'],
+          priority,
+          status,
+          notes: `No available slots for preferred time - ${priority} priority`,
+        },
+      }),
+    );
+  }
+
+  const createdEntries = await Promise.all(waitlistEntries);
+  console.log(`✅ Created ${createdEntries.length} waitlist entries`);
+  return createdEntries;
 }
 
 main()

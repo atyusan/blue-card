@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsDateString, IsPositive } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsDateString,
+  IsPositive,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMedicationInventoryDto {
@@ -47,7 +54,7 @@ export class CreateMedicationInventoryDto {
 
   @ApiProperty({
     description: 'Selling price per unit',
-    example: 0.50,
+    example: 0.5,
   })
   @IsNumber()
   @IsPositive()

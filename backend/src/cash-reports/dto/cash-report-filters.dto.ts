@@ -167,4 +167,3 @@ export class CashReportResponseDto {
   @ApiProperty({ description: 'Yearly statistics', type: [YearlyStatsDto] })
   yearlyStats: YearlyStatsDto[];
 }
-

@@ -1,55 +1,66 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Card,
-  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Button,
   TextField,
-  InputAdornment,
-  IconButton,
-  TableContainer,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TablePagination,
-  Alert,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  Chip,
   FormControl,
   InputLabel,
   Select,
+  MenuItem,
+  InputAdornment,
   Avatar,
+  Chip,
+  IconButton,
   Tooltip,
+  Alert,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
+  Divider,
   Skeleton,
+  TablePagination,
+  Menu,
+  ListItemIcon,
 } from '@mui/material';
 import {
   Search,
   FilterList,
-  MoreVert,
+  Add,
   Edit,
   Delete,
   Visibility,
-  Event,
-  Schedule,
+  Refresh,
+  Download,
+  CalendarToday,
   Person,
+  LocalHospital,
+  Schedule,
+  CheckCircle,
+  Cancel,
+  Warning,
+  Info,
+  MoreVert,
   MedicalServices,
+  Event,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { appointmentService } from '../services/appointment.service';
 import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
-import { appointmentService } from '../services/appointment.service';
+import type { Appointment, AppointmentSearchResult } from '../types';
 import { formatDate, formatTime } from '../utils';
 import toast from 'react-hot-toast';
-import type { Appointment, PaginatedResponse } from '../types';
 
 const AppointmentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,7 +80,7 @@ const AppointmentsPage: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<string>('');
 
   // Query parameters
-  const queryParams = useMemo(
+  const queryParams = useCallback(
     () => ({
       page: page + 1,
       limit: rowsPerPage,
@@ -86,15 +97,20 @@ const AppointmentsPage: React.FC = () => {
     isLoading,
     isError,
     refetch,
-  } = useQuery<PaginatedResponse<Appointment>>({
-    queryKey: ['appointments', queryParams],
-    queryFn: () => appointmentService.getAppointments(queryParams),
-    placeholderData: (previousData) => previousData,
+  } = useQuery<AppointmentSearchResult>({
+    queryKey: ['appointments', queryParams()],
+    queryFn: () => appointmentService.getAppointments(queryParams()),
+    placeholderData: (previousData: AppointmentSearchResult | undefined) =>
+      previousData,
   });
 
   // Cancel appointment mutation
   const cancelAppointmentMutation = useMutation({
-    mutationFn: (id: string) => appointmentService.cancelAppointment(id),
+    mutationFn: (id: string) =>
+      appointmentService.cancelAppointment({
+        appointmentId: id,
+        cancellationReason: 'Cancelled by user',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       toast.success('Appointment cancelled successfully');
@@ -263,8 +279,8 @@ const AppointmentsPage: React.FC = () => {
     );
   }
 
-  const appointments = appointmentsData?.data || [];
-  const totalCount = appointmentsData?.pagination.total || 0;
+  const appointments = appointmentsData?.appointments || [];
+  const totalCount = appointmentsData?.total || 0;
 
   return (
     <Box>
@@ -348,7 +364,7 @@ const AppointmentsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {appointments.map((appointment) => (
+              {appointments.map((appointment: Appointment) => (
                 <TableRow key={appointment.id} hover>
                   <TableCell>
                     <Box display='flex' alignItems='center' gap={2}>

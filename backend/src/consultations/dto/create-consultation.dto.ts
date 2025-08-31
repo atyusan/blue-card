@@ -52,7 +52,7 @@ export class CreateConsultationDto {
 
   @ApiProperty({
     description: 'Consultation fee',
-    example: 50.00,
+    example: 50.0,
     required: false,
   })
   @IsDecimal()

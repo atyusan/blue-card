@@ -89,6 +89,14 @@ async function bootstrap() {
     )
     .addTag('Cash Requests', 'Cash request management')
     .addTag('Paystack Integration', 'Paystack Terminal payment processing')
+    .addTag(
+      'Appointments',
+      'Comprehensive appointment management with intelligent scheduling, billing integration, and provider management',
+    )
+    .addTag(
+      'Notifications',
+      'Multi-channel notification system with templates, scheduling, and delivery tracking',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

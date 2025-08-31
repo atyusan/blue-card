@@ -46,11 +46,18 @@ model StaffMember {
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   anesthesiologistSurgeries Surgery[]         @relation("Anesthesiologist")
   surgeries                 Surgery[]
+  appointments              Appointment[]     @relation("ProviderAppointments")
 
   // Cash Request Relations
   cashRequestRequests   CashRequest[] @relation("CashRequestRequester")
   cashRequestApprovals  CashRequest[] @relation("CashRequestApprover")
   cashRequestRejections CashRequest[] @relation("CashRequestRejector")
+
+  // New appointment-related relations
+  providerSlots     AppointmentSlot[]  @relation("ProviderSlots")
+  providerSchedules ProviderSchedule[] @relation("ProviderSchedules")
+  providerTimeOff   ProviderTimeOff[]  @relation("ProviderTimeOff")
+  timeOffApprovals  ProviderTimeOff[]  @relation("TimeOffApprover")
 
   @@map("staff_members")
 }
@@ -91,6 +98,11 @@ model Patient {
   prescriptions                Prescription[]
   refunds                      Refund[]
   surgeries                    Surgery[]
+
+  // New appointment-related relations
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+  preferences     PatientPreference[]
 
   @@map("patients")
 }
@@ -162,6 +174,7 @@ model Invoice {
   payments          Payment[]
   paystackInvoice   PaystackInvoice?
   refunds           Refund[]
+  appointments      Appointment[] // Link to appointments
 
   @@map("invoices")
 }
@@ -657,6 +670,262 @@ model PaystackInvoice {
   @@map("paystack_invoices")
 }
 
+// ===== APPOINTMENT SCHEDULING SYSTEM =====
+
+model AppointmentSlot {
+  id               String   @id @default(cuid())
+  providerId       String // Staff member (doctor, specialist)
+  resourceId       String? // Room, equipment, etc.
+  startTime        DateTime
+  endTime          DateTime
+  duration         Int // Duration in minutes
+  slotType         SlotType
+  isAvailable      Boolean  @default(true)
+  isBookable       Boolean  @default(true)
+  maxBookings      Int      @default(1) // For group sessions
+  currentBookings  Int      @default(0)
+  bufferTimeBefore Int      @default(0) // Minutes before slot
+  bufferTimeAfter  Int      @default(0) // Minutes after slot
+  specialty        String? // Medical specialty
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  provider         StaffMember           @relation("ProviderSlots", fields: [providerId], references: [id])
+  resource         Resource?             @relation(fields: [resourceId], references: [id])
+  appointments     Appointment[]
+  recurringPattern RecurringSlotPattern?
+
+  @@map("appointment_slots")
+}
+
+model Resource {
+  id                  String       @id @default(cuid())
+  name                String
+  type                ResourceType
+  location            String?
+  capacity            Int          @default(1)
+  isActive            Boolean      @default(true)
+  maintenanceSchedule String?
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  slots     AppointmentSlot[]
+  schedules ResourceSchedule[]
+
+  @@map("resources")
+}
+
+model ResourceSchedule {
+  id          String   @id @default(cuid())
+  resourceId  String
+  dayOfWeek   Int // 0-6 (Sunday-Saturday)
+  startTime   String // HH:MM format
+  endTime     String // HH:MM format
+  isAvailable Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+
+  @@map("resource_schedules")
+}
+
+model RecurringSlotPattern {
+  id             String               @id @default(cuid())
+  slotId         String               @unique
+  patternType    RecurringPatternType
+  interval       Int // Every X days/weeks/months
+  daysOfWeek     Int[] // [0,1,2,3,4,5,6] for days
+  startDate      DateTime
+  endDate        DateTime?
+  maxOccurrences Int? // Limit number of recurrences
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  slot AppointmentSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_slot_patterns")
+}
+
+model Appointment {
+  id              String              @id @default(cuid())
+  patientId       String
+  slotId          String
+  providerId      String // Direct reference to provider for performance
+  status          AppointmentStatus   @default(SCHEDULED)
+  appointmentType AppointmentType
+  priority        AppointmentPriority @default(ROUTINE)
+
+  // Billing Integration
+  totalAmount        Decimal @default(0) @db.Decimal(10, 2)
+  paidAmount         Decimal @default(0) @db.Decimal(10, 2)
+  balance            Decimal @default(0) @db.Decimal(10, 2)
+  isPaid             Boolean @default(false)
+  requiresPrePayment Boolean @default(true)
+  invoiceId          String? // Link to invoice
+
+  // Appointment Details
+  reason             String?
+  symptoms           String?
+  notes              String?
+  cancellationReason String?
+
+  // Timing
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  actualStart    DateTime?
+  actualEnd      DateTime?
+  checkInTime    DateTime?
+
+  // Bundle Support
+  parentAppointmentId String? // For bundled appointments
+  bundleId            String? // Group related appointments
+
+  // Relations
+  patient           Patient                   @relation(fields: [patientId], references: [id])
+  slot              AppointmentSlot           @relation(fields: [slotId], references: [id])
+  provider          StaffMember               @relation("ProviderAppointments", fields: [providerId], references: [id])
+  parentAppointment Appointment?              @relation("AppointmentBundle", fields: [parentAppointmentId], references: [id])
+  childAppointments Appointment[]             @relation("AppointmentBundle")
+  bundle            AppointmentBundle?        @relation(fields: [bundleId], references: [id])
+  invoice           Invoice?                  @relation(fields: [invoiceId], references: [id])
+  notifications     AppointmentNotification[]
+  preferences       PatientPreference[]
+  waitlist          WaitlistEntry?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("appointments")
+}
+
+model AppointmentBundle {
+  id             String     @id @default(cuid())
+  name           String
+  description    String?
+  bundleType     BundleType
+  totalAmount    Decimal    @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal    @default(0) @db.Decimal(10, 2)
+  finalAmount    Decimal    @default(0) @db.Decimal(10, 2)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  appointments Appointment[]
+
+  @@map("appointment_bundles")
+}
+
+model WaitlistEntry {
+  id                 String           @id @default(cuid())
+  appointmentId      String           @unique
+  patientId          String
+  requestedDate      DateTime
+  preferredTimeSlots String[] // Array of preferred time ranges
+  priority           WaitlistPriority @default(NORMAL)
+  status             WaitlistStatus   @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  // Relations
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient     Patient     @relation(fields: [patientId], references: [id])
+
+  @@map("waitlist_entries")
+}
+
+model PatientPreference {
+  id              String         @id @default(cuid())
+  patientId       String
+  appointmentId   String?
+  preferenceType  PreferenceType
+  preferenceValue String // JSON string for complex preferences
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@map("patient_preferences")
+}
+
+model AppointmentNotification {
+  id               String              @id @default(cuid())
+  appointmentId    String
+  notificationType NotificationType
+  channel          NotificationChannel
+  recipient        String // Email, phone, or user ID
+  content          String
+  status           NotificationStatus  @default(PENDING)
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  errorMessage     String?
+  retryCount       Int                 @default(0)
+  maxRetries       Int                 @default(3)
+  scheduledFor     DateTime? // For scheduled notifications
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  // Relations
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_notifications")
+}
+
+model ProviderSchedule {
+  id              String   @id @default(cuid())
+  providerId      String
+  dayOfWeek       Int // 0-6 (Sunday-Saturday)
+  startTime       String // HH:MM format
+  endTime         String // HH:MM format
+  breakStart      String? // HH:MM format
+  breakEnd        String? // HH:MM format
+  isAvailable     Boolean  @default(true)
+  maxAppointments Int      @default(20)
+  slotDuration    Int      @default(30) // Minutes
+  bufferTime      Int      @default(5) // Minutes between appointments
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  provider StaffMember @relation("ProviderSchedules", fields: [providerId], references: [id])
+
+  @@map("provider_schedules")
+}
+
+model ProviderTimeOff {
+  id         String        @id @default(cuid())
+  providerId String
+  startDate  DateTime
+  endDate    DateTime
+  reason     String
+  type       TimeOffType
+  status     TimeOffStatus @default(PENDING)
+  approvedBy String?
+  approvedAt DateTime?
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  // Relations
+  provider StaffMember  @relation("ProviderTimeOff", fields: [providerId], references: [id])
+  approver StaffMember? @relation("TimeOffApprover", fields: [approvedBy], references: [id])
+
+  @@map("provider_time_off")
+}
+
 enum PaystackInvoiceStatus {
   PENDING
   SUCCESS
@@ -825,4 +1094,193 @@ enum RequestStatus {
   REJECTED
   CANCELLED
   COMPLETED
+}
+
+// ===== APPOINTMENT SCHEDULING ENUMS =====
+
+enum SlotType {
+  CONSULTATION
+  LAB_TEST
+  IMAGING
+  SURGERY
+  FOLLOW_UP
+  EMERGENCY
+  GROUP_SESSION
+  TELEMEDICINE
+}
+
+enum ResourceType {
+  CONSULTATION_ROOM
+  LAB_ROOM
+  IMAGING_ROOM
+  OPERATING_ROOM
+  RECOVERY_ROOM
+  EQUIPMENT
+  VEHICLE
+}
+
+enum RecurringPatternType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum AppointmentType {
+  GENERAL_CONSULTATION
+  SPECIALIST_CONSULTATION
+  LAB_TEST
+  IMAGING
+  SURGERY
+  FOLLOW_UP
+  EMERGENCY
+  TELEMEDICINE
+  PREVENTIVE_CARE
+}
+
+enum AppointmentPriority {
+  ROUTINE
+  URGENT
+  EMERGENCY
+  VIP
+  FOLLOW_UP
+}
+
+enum BundleType {
+  CONSULTATION_LAB
+  CONSULTATION_IMAGING
+  SURGERY_PACKAGE
+  PREVENTIVE_PACKAGE
+  SPECIALIST_PACKAGE
+}
+
+enum WaitlistPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WaitlistStatus {
+  ACTIVE
+  FILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum PreferenceType {
+  PROVIDER_PREFERENCE
+  TIME_PREFERENCE
+  LOCATION_PREFERENCE
+  COMMUNICATION_PREFERENCE
+  SPECIAL_NEEDS
+}
+
+// ===== NOTIFICATION SYSTEM =====
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMATION
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLATION
+  APPOINTMENT_RESCHEDULE
+  PRE_VISIT_INSTRUCTIONS
+  PAYMENT_REMINDER
+  WAITLIST_UPDATE
+  PAYMENT_RECEIVED
+  PAYMENT_OVERDUE
+  GENERAL_ANNOUNCEMENT
+  SYSTEM_ALERT
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH_NOTIFICATION
+  IN_APP
+  PHONE_CALL
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+  SCHEDULED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model NotificationTemplate {
+  id        String              @id @default(cuid())
+  name      String              @unique
+  type      String
+  channel   NotificationChannel
+  subject   String?
+  content   String
+  variables Json? // Array of variable names that can be replaced
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@map("notification_templates")
+}
+
+model Notification {
+  id              String               @id @default(cuid())
+  type            String
+  channel         NotificationChannel
+  recipientId     String
+  recipientType   String // PATIENT, STAFF, USER, etc.
+  subject         String?
+  content         String
+  metadata        Json? // Additional data for the notification
+  scheduledFor    DateTime? // For scheduled notifications
+  sentAt          DateTime?
+  status          NotificationStatus   @default(PENDING)
+  priority        NotificationPriority @default(NORMAL)
+  failureReason   String?
+  retryCount      Int                  @default(0)
+  deliveryDetails Json? // Delivery confirmation details
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  // Relations
+  recipient Json? // Polymorphic relation - could be Patient, StaffMember, User, etc.
+
+  @@map("notifications")
+}
+
+enum TimeOffType {
+  VACATION
+  SICK_LEAVE
+  PERSONAL_LEAVE
+  TRAINING
+  CONFERENCE
+  OTHER
+}
+
+enum TimeOffStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }

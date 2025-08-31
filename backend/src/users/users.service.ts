@@ -52,19 +52,28 @@ export class UsersService {
     return user;
   }
 
-  findAll(query?: { role?: string; isActive?: boolean; search?: string }) {
+  async findAll(query?: {
+    role?: string;
+    isActive?: boolean;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { page = 1, limit = 50, ...filters } = query || {};
+    const skip = (page - 1) * limit;
+
     const where: any = {};
 
-    if (query?.role) {
-      where.role = query.role;
+    if (filters?.role) {
+      where.role = filters.role;
     }
 
-    if (query?.isActive !== undefined) {
-      where.isActive = query.isActive;
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive;
     }
 
-    if (query?.search) {
-      const term = query.search;
+    if (filters?.search) {
+      const term = filters.search;
       where.OR = [
         { email: { contains: term, mode: 'insensitive' } },
         { username: { contains: term, mode: 'insensitive' } },
@@ -73,7 +82,11 @@ export class UsersService {
       ];
     }
 
-    return this.prisma.user.findMany({
+    // Get total count for pagination
+    const total = await this.prisma.user.count({ where });
+
+    // Get users with pagination
+    const users = await this.prisma.user.findMany({
       where,
       select: {
         id: true,
@@ -87,7 +100,19 @@ export class UsersService {
         updatedAt: true,
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      skip,
+      take: limit,
     });
+
+    return {
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findById(id: string) {

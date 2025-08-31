@@ -32,10 +32,12 @@ import ProcessPaymentPage from './pages/ProcessPaymentPage';
 import RefundsPage from './pages/RefundsPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
+import NotificationsPage from './pages/NotificationsPage';
 import CashOfficeTransactionsPage from './pages/CashOfficeTransactionsPage';
 import CashRequestsPage from './pages/CashRequestsPage';
 import CashReportsPage from './pages/CashReportsPage';
 import Layout from './components/layout/Layout';
+import CreateAppointmentPage from './pages/CreateAppointmentPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -139,6 +141,10 @@ function App() {
 
                   {/* Appointments Routes */}
                   <Route path='appointments' element={<AppointmentsPage />} />
+                  <Route
+                    path='appointments/create'
+                    element={<CreateAppointmentPage />}
+                  />
 
                   {/* Payment Routes */}
                   <Route path='payments' element={<PaymentsPage />} />
@@ -162,6 +168,9 @@ function App() {
                     path='cash-office/reports'
                     element={<CashReportsPage />}
                   />
+
+                  {/* Notifications Routes */}
+                  <Route path='notifications' element={<NotificationsPage />} />
 
                   {/* Add more routes here as we build them */}
                   <Route

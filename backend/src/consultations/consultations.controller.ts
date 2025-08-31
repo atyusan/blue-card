@@ -225,7 +225,9 @@ export class ConsultationsController {
   }
 
   @Get(':id/payment-status')
-  @ApiOperation({ summary: 'Check payment status before allowing consultation completion' })
+  @ApiOperation({
+    summary: 'Check payment status before allowing consultation completion',
+  })
   @ApiResponse({
     status: 200,
     description: 'Payment status checked successfully',
