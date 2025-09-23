@@ -1,24 +1,45 @@
-import { http } from './api';
-import type { Service, PaginatedResponse } from '../types';
+import { apiClient } from '../lib/api-client';
+import type { Service } from '../types';
 
 export interface ServiceQueryParams {
-  page?: number;
-  limit?: number;
+  categoryId?: string;
+  departmentId?: string;
+  isActive?: boolean;
   search?: string;
-  category?: string;
-  active?: boolean;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  requiresPrePayment?: boolean;
 }
 
 export interface CreateServiceData {
   name: string;
   description?: string;
-  category: string;
+  categoryId: string;
+  basePrice: number;
+  serviceCode?: string;
+  departmentId?: string;
+  requiresPrePayment?: boolean;
+}
+
+export type UpdateServiceData = Partial<CreateServiceData>;
+
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  services?: Service[];
+}
+
+export interface CreateServiceCategoryData {
+  name: string;
+  description?: string;
+}
+
+export type UpdateServiceCategoryData = Partial<CreateServiceCategoryData>;
+
+export interface UpdateServicePriceData {
   price: number;
-  duration: number;
-  active: boolean;
-  code?: string;
 }
 
 export interface ServiceStats {
@@ -36,11 +57,22 @@ export interface ServiceStats {
   }>;
 }
 
+export interface ServicesResponse {
+  data: Service[];
+  counts: {
+    totalServices: number;
+    activeServices: number;
+    inactiveServices: number;
+  };
+}
+
 class ServiceService {
-  // Get all services with pagination and filtering
+  // ===== SERVICE CRUD OPERATIONS =====
+
+  // Get all services with filtering
   async getServices(
     params: ServiceQueryParams = {}
-  ): Promise<PaginatedResponse<Service>> {
+  ): Promise<ServicesResponse> {
     const queryParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {
@@ -49,109 +81,142 @@ class ServiceService {
       }
     });
 
-    const response = await http.get<PaginatedResponse<Service>>(
+    const response = await apiClient.get<ServicesResponse>(
       `/services?${queryParams.toString()}`
     );
-    return response;
+    return response.data;
   }
 
   // Get service by ID
   async getServiceById(id: string): Promise<Service> {
-    const response = await http.get<Service>(`/services/${id}`);
-    return response;
+    const response = await apiClient.get<Service>(`/services/${id}`);
+    return response.data;
   }
 
   // Create new service
   async createService(serviceData: CreateServiceData): Promise<Service> {
-    const response = await http.post<Service>('/services', serviceData);
-    return response;
+    const response = await apiClient.post<Service>('/services', serviceData);
+    return response.data;
   }
 
   // Update service
   async updateService(
     id: string,
-    serviceData: Partial<CreateServiceData>
+    serviceData: UpdateServiceData
   ): Promise<Service> {
-    const response = await http.put<Service>(`/services/${id}`, serviceData);
-    return response;
+    const response = await apiClient.patch<Service>(
+      `/services/${id}`,
+      serviceData
+    );
+    return response.data;
+  }
+
+  // Deactivate service
+  async deactivateService(id: string): Promise<void> {
+    await apiClient.put(`/services/${id}/deactivate`);
   }
 
   // Delete service
   async deleteService(id: string): Promise<void> {
-    await http.delete(`/services/${id}`);
+    await apiClient.delete(`/services/${id}`);
   }
 
-  // Get service statistics
-  async getServiceStats(): Promise<ServiceStats> {
-    const response = await http.get<ServiceStats>('/services/stats');
-    return response;
+  // Update service price
+  async updateServicePrice(id: string, price: number): Promise<Service> {
+    const response = await apiClient.patch<Service>(`/services/${id}/price`, {
+      price,
+    });
+    return response.data;
   }
 
-  // Get service categories
-  async getServiceCategories(): Promise<string[]> {
-    const response = await http.get<string[]>('/services/categories');
-    return response;
+  // Get services by department
+  async getServicesByDepartment(departmentId: string): Promise<Service[]> {
+    const response = await apiClient.get<Service[]>(
+      `/services/department/${departmentId}`
+    );
+    return response.data;
   }
 
   // Get services by category
-  async getServicesByCategory(category: string): Promise<Service[]> {
-    const response = await http.get<Service[]>(
-      `/services/category/${category}`
+  async getServicesByCategory(categoryId: string): Promise<Service[]> {
+    const response = await apiClient.get<Service[]>(
+      `/services/categories/${categoryId}/services`
     );
-    return response;
+    return response.data;
   }
+
+  // Get services requiring pre-payment
+  async getServicesRequiringPrePayment(): Promise<Service[]> {
+    const response = await apiClient.get<Service[]>(
+      '/services/pre-payment-required'
+    );
+    return response.data;
+  }
+
+  // ===== SERVICE CATEGORY CRUD OPERATIONS =====
+
+  // Get all service categories
+  async getServiceCategories(): Promise<ServiceCategory[]> {
+    const response = await apiClient.get<ServiceCategory[]>(
+      '/services/categories'
+    );
+    return response.data;
+  }
+
+  // Get service category by ID
+  async getServiceCategoryById(id: string): Promise<ServiceCategory> {
+    const response = await apiClient.get<ServiceCategory>(
+      `/services/categories/${id}`
+    );
+    return response.data;
+  }
+
+  // Create new service category
+  async createServiceCategory(
+    categoryData: CreateServiceCategoryData
+  ): Promise<ServiceCategory> {
+    const response = await apiClient.post<ServiceCategory>(
+      '/services/categories',
+      categoryData
+    );
+    return response.data;
+  }
+
+  // Update service category
+  async updateServiceCategory(
+    id: string,
+    categoryData: UpdateServiceCategoryData
+  ): Promise<ServiceCategory> {
+    const response = await apiClient.patch<ServiceCategory>(
+      `/services/categories/${id}`,
+      categoryData
+    );
+    return response.data;
+  }
+
+  // Delete service category (deactivate)
+  async deleteServiceCategory(id: string): Promise<void> {
+    await apiClient.delete(`/services/categories/${id}`);
+  }
+
+  // ===== UTILITY METHODS =====
 
   // Search services
   async searchServices(query: string): Promise<Service[]> {
-    const response = await http.get<Service[]>(
-      `/services/search?q=${encodeURIComponent(query)}`
-    );
-    return response;
+    const response = await this.getServices({ search: query });
+    return response.data;
   }
 
   // Get active services
   async getActiveServices(): Promise<Service[]> {
-    const response = await http.get<Service[]>('/services/active');
-    return response;
+    const response = await this.getServices({ isActive: true });
+    return response.data;
   }
 
-  // Toggle service status
-  async toggleServiceStatus(id: string): Promise<Service> {
-    const response = await http.post<Service>(`/services/${id}/toggle-status`);
-    return response;
-  }
-
-  // Bulk update services
-  async bulkUpdateServices(
-    serviceIds: string[],
-    updates: Partial<CreateServiceData>
-  ): Promise<Service[]> {
-    const response = await http.put<Service[]>('/services/bulk-update', {
-      serviceIds,
-      updates,
-    });
-    return response;
-  }
-
-  // Import services
-  async importServices(file: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await http.post<any>('/services/import', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response;
-  }
-
-  // Export services
-  async exportServices(format: 'csv' | 'excel'): Promise<Blob> {
-    const response = await http.get(`/services/export?format=${format}`, {
-      responseType: 'blob',
-    });
-    return response as unknown as Blob;
+  // Get inactive services
+  async getInactiveServices(): Promise<Service[]> {
+    const response = await this.getServices({ isActive: false });
+    return response.data;
   }
 }
 

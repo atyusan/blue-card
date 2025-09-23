@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -133,6 +134,11 @@ export class ServicesController {
     description: 'Filter by service category',
   })
   @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Filter by department',
+  })
+  @ApiQuery({
     name: 'isActive',
     required: false,
     description: 'Filter by active status',
@@ -149,6 +155,7 @@ export class ServicesController {
   })
   findAll(
     @Query('categoryId') categoryId?: string,
+    @Query('departmentId') departmentId?: string,
     @Query('isActive', new ParseBoolPipe({ optional: true }))
     isActive?: boolean,
     @Query('search') search?: string,
@@ -157,6 +164,7 @@ export class ServicesController {
   ) {
     return this.servicesService.findAll({
       categoryId,
+      departmentId,
       isActive,
       search,
       requiresPrePayment,
@@ -205,7 +213,7 @@ export class ServicesController {
     return this.servicesService.update(id, updateServiceDto);
   }
 
-  @Delete(':id')
+  @Put(':id/deactivate')
   @ApiOperation({ summary: 'Deactivate service by ID' })
   @ApiResponse({
     status: 200,
@@ -219,7 +227,25 @@ export class ServicesController {
     status: 409,
     description: 'Cannot delete service that is being used in active charges',
   })
-  remove(@Param('id') id: string) {
+  deactivate(@Param('id') id: string) {
+    return this.servicesService.deactivate(id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete service by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service deleted successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Cannot delete service that is being used in active charges',
+  })
+  delete(@Param('id') id: string) {
     return this.servicesService.remove(id);
   }
 

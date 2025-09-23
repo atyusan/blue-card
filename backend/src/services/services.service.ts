@@ -153,6 +153,7 @@ export class ServicesService {
 
   async findAll(query?: {
     categoryId?: string;
+    departmentId?: string;
     isActive?: boolean;
     search?: string;
     requiresPrePayment?: boolean;
@@ -161,6 +162,10 @@ export class ServicesService {
 
     if (query?.categoryId) {
       where.categoryId = query.categoryId;
+    }
+
+    if (query?.departmentId) {
+      where.departmentId = query.departmentId;
     }
 
     if (query?.isActive !== undefined) {
@@ -179,14 +184,29 @@ export class ServicesService {
       ];
     }
 
-    return this.prisma.service.findMany({
-      where,
-      include: {
-        category: true,
-        department: true,
+    const [services, totalServices, activeServices, inactiveServices] =
+      await Promise.all([
+        this.prisma.service.findMany({
+          where,
+          include: {
+            category: true,
+            department: true,
+          },
+          orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+        }),
+        this.prisma.service.count(), // Total services
+        this.prisma.service.count({ where: { isActive: true } }), // Active services
+        this.prisma.service.count({ where: { isActive: false } }), // Inactive services
+      ]);
+
+    return {
+      data: services,
+      counts: {
+        totalServices,
+        activeServices,
+        inactiveServices,
       },
-      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
-    });
+    };
   }
 
   async findById(id: string) {
@@ -268,6 +288,27 @@ export class ServicesService {
     if (chargesCount > 0) {
       throw new ConflictException(
         'Cannot delete service that is being used in active charges',
+      );
+    }
+
+    await this.prisma.service.delete({
+      where: { id },
+    });
+
+    return { message: 'Service deleted successfully' };
+  }
+
+  async deactivate(id: string) {
+    await this.findById(id);
+
+    // Check if service is being used in any active charges
+    const chargesCount = await this.prisma.charge.count({
+      where: { serviceId: id, isActive: true },
+    });
+
+    if (chargesCount > 0) {
+      throw new ConflictException(
+        'Cannot deactivate service that is being used in active charges',
       );
     }
 
