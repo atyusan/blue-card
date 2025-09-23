@@ -52,6 +52,15 @@ export class RolesService {
 
     return this.prisma.role.findMany({
       where,
+      include: {
+        _count: {
+          select: {
+            staffRoleAssignments: {
+              where: { isActive: true },
+            },
+          },
+        },
+      },
       orderBy: { name: 'asc' },
     });
   }
