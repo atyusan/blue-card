@@ -134,13 +134,17 @@ export class ServicesService {
       );
     }
 
+    const { departmentId, ...serviceData } = createServiceDto;
+
     const service = await this.prisma.service.create({
       data: {
-        ...createServiceDto,
-        currentPrice: createServiceDto.basePrice, // Set current price to base price initially
+        ...serviceData,
+        currentPrice: serviceData.basePrice, // Set current price to base price initially
+        departmentId: departmentId || null,
       },
       include: {
         category: true,
+        department: true,
       },
     });
 
@@ -179,6 +183,7 @@ export class ServicesService {
       where,
       include: {
         category: true,
+        department: true,
       },
       orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
     });
@@ -189,6 +194,7 @@ export class ServicesService {
       where: { id },
       include: {
         category: true,
+        department: true,
       },
     });
 
@@ -197,6 +203,22 @@ export class ServicesService {
     }
 
     return service;
+  }
+
+  async findByDepartment(departmentId: string) {
+    const services = await this.prisma.service.findMany({
+      where: {
+        departmentId,
+        isActive: true,
+      },
+      include: {
+        category: true,
+        department: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return services;
   }
 
   async update(id: string, updateServiceDto: UpdateServiceDto) {

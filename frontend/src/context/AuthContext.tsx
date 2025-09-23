@@ -1,291 +1,240 @@
-import React, {
-  createContext,
-  useContext,
-  useReducer,
-  useEffect,
-  type ReactNode,
-} from 'react';
-import type { User, LoginFormData } from '../types';
-import { authService, type LoginResponse } from '../services/auth.service';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { User } from '@/types/auth';
+import type { StaffMember } from '@/types/staff';
+import { apiClient } from '@/lib/api-client';
 
-// Auth state interface
-interface AuthState {
+interface AuthContextType {
   user: User | null;
-  token: string | null;
-  refreshToken: string | null;
-  isAuthenticated: boolean;
+  staffMember: StaffMember | null;
   isLoading: boolean;
   error: string | null;
-  isRefreshing: boolean;
-}
-
-// Auth action types
-type AuthAction =
-  | { type: 'AUTH_START' }
-  | {
-      type: 'AUTH_SUCCESS';
-      payload: { user: User; token: string };
-    }
-  | { type: 'AUTH_FAILURE'; payload: string }
-  | { type: 'AUTH_LOGOUT' }
-  | { type: 'CLEAR_ERROR' }
-  | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'TOKEN_REFRESH_START' }
-  | {
-      type: 'TOKEN_REFRESH_SUCCESS';
-      payload: { token: string };
-    }
-  | { type: 'TOKEN_REFRESH_FAILURE' }
-  | { type: 'SET_LOADING'; payload: boolean };
-
-// Initial auth state
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  refreshToken: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-  isRefreshing: false,
-};
-
-// Auth reducer
-const authReducer = (state: AuthState, action: AuthAction): AuthState => {
-  switch (action.type) {
-    case 'AUTH_START':
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
-
-    case 'AUTH_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        refreshToken: null, // No longer stored in state
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        isRefreshing: false,
-      };
-
-    case 'AUTH_FAILURE':
-      return {
-        ...state,
-        user: null,
-        token: null,
-        refreshToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: action.payload,
-        isRefreshing: false,
-      };
-
-    case 'AUTH_LOGOUT':
-      return {
-        ...state,
-        user: null,
-        token: null,
-        refreshToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-        isRefreshing: false,
-      };
-
-    case 'CLEAR_ERROR':
-      return {
-        ...state,
-        error: null,
-      };
-
-    case 'UPDATE_USER':
-      return {
-        ...state,
-        user: action.payload,
-      };
-
-    case 'TOKEN_REFRESH_START':
-      return {
-        ...state,
-        isRefreshing: true,
-        error: null,
-      };
-
-    case 'TOKEN_REFRESH_SUCCESS':
-      return {
-        ...state,
-        token: action.payload.token,
-        isRefreshing: false,
-        error: null,
-      };
-
-    case 'TOKEN_REFRESH_FAILURE':
-      return {
-        ...state,
-        isRefreshing: false,
-        error: 'Token refresh failed. Please login again.',
-      };
-
-    case 'SET_LOADING':
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-
-    default:
-      return state;
-  }
-};
-
-// Auth context interface
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginFormData) => Promise<void>;
-  logout: () => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
   clearError: () => void;
-  updateUser: (user: User) => void;
-  hasRole: (role: string) => boolean;
-  hasPermission: (action: string) => boolean;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
+  isAdmin: () => boolean;
+  getUserPermissions: () => string[];
+  getTemporaryPermissions: () => Promise<unknown[]>;
+  requestTemporaryPermission: (
+    permission: string,
+    reason: string,
+    expiresAt: string
+  ) => Promise<void>;
 }
 
-// Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Auth provider props
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Auth provider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  const [user, setUser] = useState<User | null>(null);
+  const [staffMember, setStaffMember] = useState<StaffMember | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if user is already authenticated on app load
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        dispatch({ type: 'SET_LOADING', payload: true });
-
-        const token = authService.getStoredToken();
-        const user = authService.getStoredUser();
-
-        if (token && user && !authService.isTokenExpired(token)) {
-          // Token is valid, restore session
-          dispatch({
-            type: 'AUTH_SUCCESS',
-            payload: { user, token },
-          });
-        } else if (user && token && authService.isTokenExpired(token)) {
-          // Token expired, redirect to login since no refresh token
-          await authService.logout();
-          dispatch({ type: 'AUTH_LOGOUT' });
-        } else {
-          // No valid tokens, clear storage
-          await authService.logout();
-          dispatch({ type: 'AUTH_LOGOUT' });
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        dispatch({ type: 'AUTH_LOGOUT' });
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    };
-
     checkAuthStatus();
   }, []);
 
-  // Set up token refresh interval
-  useEffect(() => {
-    if (!state.isAuthenticated || !state.token) return;
+  const checkAuthStatus = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user_data');
 
-    const refreshInterval = setInterval(async () => {
-      try {
-        if (state.token && authService.isTokenExpired(state.token)) {
-          // Token expired, redirect to login since no refresh token
-          await logout();
-        }
-      } catch (error) {
-        console.error('Token check failed:', error);
-        await logout();
+      if (!token || !userData) {
+        setIsLoading(false);
+        return;
       }
-    }, 4 * 60 * 1000); // Check every 4 minutes
 
-    return () => clearInterval(refreshInterval);
-  }, [state.isAuthenticated, state.token]);
+      // Set token in API client
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-  // Login function
-  const login = async (credentials: LoginFormData): Promise<void> => {
-    try {
-      dispatch({ type: 'AUTH_START' });
-
-      const response: LoginResponse = await authService.login(credentials);
-
-      dispatch({
-        type: 'AUTH_SUCCESS',
-        payload: {
-          user: response.user,
-          token: response.access_token,
-        },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Login failed';
-      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage });
-      throw error;
-    }
-  };
-
-  // Logout function
-  const logout = async (): Promise<void> => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
+      // Parse stored user data
+      const parsedUserData = JSON.parse(userData);
+      setUser(parsedUserData);
+      setStaffMember(parsedUserData.staffMember || null);
+      setError(null);
+    } catch (err) {
+      console.error('Auth check failed:', err);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_data');
+      delete apiClient.defaults.headers.common['Authorization'];
+      setUser(null);
+      setStaffMember(null);
     } finally {
-      dispatch({ type: 'AUTH_LOGOUT' });
+      setIsLoading(false);
     }
   };
 
-  // Clear error function
-  const clearError = (): void => {
-    dispatch({ type: 'CLEAR_ERROR' });
+  const login = async (username: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await apiClient.post('/auth/login', {
+        username,
+        password,
+      });
+      const { access_token, user: userData } = response.data;
+
+      // Store token and user data
+      localStorage.setItem('auth_token', access_token);
+      localStorage.setItem('user_data', JSON.stringify(userData));
+      apiClient.defaults.headers.common[
+        'Authorization'
+      ] = `Bearer ${access_token}`;
+
+      // Set user data
+      setUser(userData);
+      setStaffMember(userData.staffMember || null);
+    } catch (err: unknown) {
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || 'Login failed';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Update user function
-  const updateUser = (user: User): void => {
-    dispatch({ type: 'UPDATE_USER', payload: user });
+  const logout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    delete apiClient.defaults.headers.common['Authorization'];
+    setUser(null);
+    setStaffMember(null);
+    setError(null);
   };
 
-  // Check if user has specific role
-  const hasRole = (role: string): boolean => {
-    return authService.hasRole(role);
+  const clearError = () => {
+    setError(null);
   };
 
-  // Check if user has permission for specific action
-  const hasPermission = (action: string): boolean => {
-    return authService.hasPermission(action);
+  const refreshUser = async () => {
+    try {
+      const response = await apiClient.get('/auth/me');
+      const userData = response.data;
+
+      // Update localStorage with fresh user data
+      localStorage.setItem('user_data', JSON.stringify(userData));
+
+      setUser(userData);
+      setStaffMember(userData.staffMember || null);
+    } catch (err) {
+      console.error('Failed to refresh user:', err);
+      logout();
+    }
   };
 
-  // Context value
-  const contextValue: AuthContextType = {
-    ...state,
+  // Permission checking methods
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+
+    // Check if user has admin permission
+    if (user.permissions && Array.isArray(user.permissions)) {
+      if (user.permissions.includes('admin')) return true;
+      return user.permissions.includes(permission);
+    }
+
+    return false;
+  };
+
+  const hasAnyPermission = (permissions: string[]): boolean => {
+    if (!user) return false;
+
+    // Check if user has admin permission
+    if (user.permissions && Array.isArray(user.permissions)) {
+      if (user.permissions.includes('admin')) return true;
+      return permissions.some((permission) =>
+        user?.permissions?.includes(permission)
+      );
+    }
+
+    return false;
+  };
+
+  const hasAllPermissions = (permissions: string[]): boolean => {
+    if (!user) return false;
+
+    // Check if user has admin permission
+    if (user.permissions && Array.isArray(user.permissions)) {
+      if (user.permissions.includes('admin')) return true;
+      return permissions.every((permission) =>
+        user?.permissions?.includes(permission)
+      );
+    }
+
+    return false;
+  };
+
+  const isAdmin = (): boolean => {
+    return hasPermission('admin');
+  };
+
+  const getUserPermissions = (): string[] => {
+    if (!user || !user.permissions) return [];
+    return Array.isArray(user.permissions) ? user.permissions : [];
+  };
+
+  // Temporary permission methods
+  const getTemporaryPermissions = async (): Promise<unknown[]> => {
+    try {
+      const response = await apiClient.get('/temporary-permissions');
+      return response.data;
+    } catch (err) {
+      console.error('Failed to get temporary permissions:', err);
+      return [];
+    }
+  };
+
+  const requestTemporaryPermission = async (
+    permission: string,
+    reason: string,
+    expiresAt: string
+  ): Promise<void> => {
+    try {
+      await apiClient.post('/temporary-permissions', {
+        permission,
+        reason,
+        expiresAt,
+      });
+
+      // Refresh user data to get updated permissions
+      await refreshUser();
+    } catch (err) {
+      console.error('Failed to request temporary permission:', err);
+      throw err;
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    staffMember,
+    isLoading,
+    error,
     login,
     logout,
+    refreshUser,
     clearError,
-    updateUser,
-    hasRole,
     hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    isAdmin,
+    getUserPermissions,
+    getTemporaryPermissions,
+    requestTemporaryPermission,
   };
 
-  return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook to use auth context
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -293,5 +242,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-export default AuthContext;

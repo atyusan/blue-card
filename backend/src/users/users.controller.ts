@@ -49,11 +49,12 @@ export class UsersController {
     status: 200,
     description: 'List of all users',
   })
-  @ApiQuery({
-    name: 'role',
-    required: false,
-    description: 'Filter by user role',
-  })
+  // Role filtering removed - now handled through StaffRoleAssignment
+  // @ApiQuery({
+  //   name: 'role',
+  //   required: false,
+  //   description: 'Filter by user role',
+  // })
   @ApiQuery({
     name: 'isActive',
     required: false,
@@ -77,14 +78,14 @@ export class UsersController {
     example: 50,
   })
   findAll(
-    @Query('role') role?: string,
+    // Role parameter removed - now handled through StaffRoleAssignment
     @Query('isActive', new ParseBoolPipe({ optional: true }))
     isActive?: boolean,
     @Query('search') search?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.usersService.findAll({ role, isActive, search, page, limit });
+    return this.usersService.findAll({ isActive, search, page, limit });
   }
 
   @Get(':id')

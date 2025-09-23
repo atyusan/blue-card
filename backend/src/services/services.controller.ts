@@ -163,6 +163,20 @@ export class ServicesController {
     });
   }
 
+  @Get('department/:departmentId')
+  @ApiOperation({ summary: 'Get services by department' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of services in the department',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Department not found',
+  })
+  findByDepartment(@Param('departmentId') departmentId: string) {
+    return this.servicesService.findByDepartment(departmentId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get service by ID' })
   @ApiResponse({

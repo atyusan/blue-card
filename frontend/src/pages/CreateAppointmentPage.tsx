@@ -21,7 +21,7 @@ import {
 import { CalendarToday } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { useToast } from '@/context/ToastContext';
 
 // Import the working CustomCalendar component
 import CustomCalendar from '../components/appointments/CustomCalendar';
@@ -50,6 +50,7 @@ const steps = [
 const CreateAppointmentPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [activeStep, setActiveStep] = useState(0);
 
   // State variables
@@ -163,12 +164,12 @@ const CreateAppointmentPage: React.FC = () => {
       appointmentService.createAppointment(appointmentData),
     onSuccess: (appointment) => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      toast.success('Appointment created successfully!');
+      showSuccess('Appointment created successfully!');
       navigate(`/appointments/${appointment.id}`);
     },
     onError: (error) => {
       console.error('Create appointment error:', error);
-      toast.error('Failed to create appointment. Please try again.');
+      showError('Failed to create appointment. Please try again.');
     },
   });
 
@@ -228,7 +229,7 @@ const CreateAppointmentPage: React.FC = () => {
       !selectedProvider ||
       !selectedSlot
     ) {
-      toast.error('Please complete all required fields');
+      showError('Please complete all required fields');
       return;
     }
 

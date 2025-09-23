@@ -7,10 +7,14 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
+import { UserPermissionsService } from '../users/user-permissions.service';
 
 @Injectable()
 export class ConsultationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
   async create(createConsultationDto: CreateConsultationDto) {
     const { patientId, doctorId, ...consultationData } = createConsultationDto;
@@ -30,8 +34,18 @@ export class ConsultationsService {
       include: { user: true },
     });
 
-    if (!doctor || doctor.user.role !== 'DOCTOR') {
-      throw new NotFoundException('Doctor not found or invalid role');
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    // Check if doctor has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      doctor.userId,
+      ['conduct_consultations', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException('Doctor not authorized for consultations');
     }
 
     // Check for appointment conflicts

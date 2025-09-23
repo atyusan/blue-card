@@ -10,13 +10,17 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { CreatePrescriptionMedicationDto } from './dto/create-prescription-medication.dto';
 import { UpdatePrescriptionMedicationDto } from './dto/update-prescription-medication.dto';
+import { UserPermissionsService } from '../users/user-permissions.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { CreateMedicationInventoryDto } from './dto/create-medication-inventory.dto';
 import { DispenseMedicationDto } from './dto/dispense-medication.dto';
 
 @Injectable()
 export class PharmacyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
   // ===== MEDICATION MANAGEMENT =====
 
@@ -263,9 +267,19 @@ export class PharmacyService {
       include: { user: true },
     });
 
-    if (!doctor || !['DOCTOR', 'PHARMACIST'].includes(doctor.user.role)) {
-      throw new NotFoundException(
-        'Doctor not found or not authorized to write prescriptions',
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    // Check if doctor has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      doctor.userId,
+      ['write_prescriptions', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'Doctor not authorized to write prescriptions',
       );
     }
 

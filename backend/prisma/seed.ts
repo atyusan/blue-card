@@ -1,6 +1,6 @@
 import {
   PrismaClient,
-  UserRole,
+  // UserRole removed - now handled through Role model and StaffRoleAssignment
   Gender,
   WardType,
   ConsultationType,
@@ -69,7 +69,9 @@ async function main() {
 
   // Seed data in order of dependencies
   await seedUsers();
+  await seedRoles();
   await seedStaffMembers();
+  await seedStaffRoleAssignments();
   await seedPatients();
   await seedPatientAccounts();
   await seedServiceCategories();
@@ -245,9 +247,11 @@ async function seedPatientAccounts() {
   console.log('💰 Seeding patient accounts...');
 
   const patients = await prisma.patient.findMany();
-  const existingUsers = await prisma.user.findMany({
-    where: { role: 'PATIENT' },
-  });
+  // Role filtering removed - now handled through StaffRoleAssignment
+  // const existingUsers = await prisma.user.findMany({
+  //   where: { role: 'PATIENT' },
+  // });
+  const existingUsers: any[] = [];
 
   if (patients.length === 0) {
     console.log('⚠️ Skipping patient accounts - no patients found');
@@ -286,7 +290,7 @@ async function seedPatientAccounts() {
         password: tempPassword,
         firstName: patient.firstName,
         lastName: patient.lastName,
-        role: 'PATIENT',
+        // role field removed - now handled through StaffRoleAssignment
       },
     });
 
@@ -1107,7 +1111,8 @@ async function seedUsers() {
       password: await bcrypt.hash('admin123', 10),
       firstName: 'John',
       lastName: 'Admin',
-      role: UserRole.ADMIN,
+      permissions: ['admin'], // Admin has all permissions
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'doctor.smith@hospital.com',
@@ -1115,7 +1120,7 @@ async function seedUsers() {
       password: await bcrypt.hash('doctor123', 10),
       firstName: 'Sarah',
       lastName: 'Smith',
-      role: UserRole.DOCTOR,
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'doctor.johnson@hospital.com',
@@ -1123,7 +1128,7 @@ async function seedUsers() {
       password: await bcrypt.hash('doctor123', 10),
       firstName: 'Michael',
       lastName: 'Johnson',
-      role: UserRole.DOCTOR,
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'nurse.wilson@hospital.com',
@@ -1131,7 +1136,7 @@ async function seedUsers() {
       password: await bcrypt.hash('nurse123', 10),
       firstName: 'Emily',
       lastName: 'Wilson',
-      role: UserRole.NURSE,
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'cashier.brown@hospital.com',
@@ -1139,7 +1144,7 @@ async function seedUsers() {
       password: await bcrypt.hash('cashier123', 10),
       firstName: 'David',
       lastName: 'Brown',
-      role: UserRole.CASHIER,
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'pharmacist.davis@hospital.com',
@@ -1147,7 +1152,7 @@ async function seedUsers() {
       password: await bcrypt.hash('pharmacist123', 10),
       firstName: 'Lisa',
       lastName: 'Davis',
-      role: UserRole.PHARMACIST,
+      // role field removed - now handled through StaffRoleAssignment
     },
     {
       email: 'lab.tech@hospital.com',
@@ -1155,7 +1160,7 @@ async function seedUsers() {
       password: await bcrypt.hash('lab123', 10),
       firstName: 'Robert',
       lastName: 'Taylor',
-      role: UserRole.LAB_TECHNICIAN,
+      // role field removed - now handled through StaffRoleAssignment
     },
   ];
 
@@ -1264,6 +1269,234 @@ async function seedStaffMembers() {
   }
 
   console.log(`✅ Created ${staffMembers.length} staff members`);
+}
+
+async function seedRoles() {
+  console.log('🎭 Seeding roles...');
+
+  // Check if roles already exist
+  const existingRoles = await prisma.role.count();
+  if (existingRoles > 0) {
+    console.log(
+      `⚠️  Roles already exist (${existingRoles}), skipping role creation`,
+    );
+    return;
+  }
+
+  const roles = [
+    {
+      name: 'Administrator',
+      code: 'ADMIN',
+      description: 'Full system access and management capabilities',
+      permissions: ['admin'],
+      isActive: true,
+    },
+    {
+      name: 'Doctor',
+      code: 'DOCTOR',
+      description:
+        'Medical staff with patient care and consultation permissions',
+      permissions: [
+        'view_patients',
+        'create_patients',
+        'update_patients',
+        'view_appointments',
+        'create_appointments',
+        'update_appointments',
+        'view_consultations',
+        'create_consultations',
+        'update_consultations',
+        'view_lab_orders',
+        'create_lab_orders',
+        'view_prescriptions',
+        'create_prescriptions',
+        'view_surgeries',
+        'create_surgeries',
+        'view_billing',
+        'view_reports',
+      ],
+      isActive: true,
+    },
+    {
+      name: 'Nurse',
+      code: 'NURSE',
+      description: 'Nursing staff with patient care permissions',
+      permissions: [
+        'view_patients',
+        'update_patients',
+        'view_appointments',
+        'update_appointments',
+        'view_consultations',
+        'update_consultations',
+        'view_lab_orders',
+        'view_prescriptions',
+        'view_surgeries',
+        'view_billing',
+      ],
+      isActive: true,
+    },
+    {
+      name: 'Cashier',
+      code: 'CASHIER',
+      description:
+        'Financial staff with payment and cash management permissions',
+      permissions: [
+        'view_patients',
+        'view_billing',
+        'create_payments',
+        'update_payments',
+        'view_cash_transactions',
+        'create_cash_transactions',
+        'view_cash_requests',
+        'create_cash_requests',
+        'view_reports',
+      ],
+      isActive: true,
+    },
+    {
+      name: 'Pharmacist',
+      code: 'PHARMACIST',
+      description: 'Pharmacy staff with medication management permissions',
+      permissions: [
+        'view_patients',
+        'view_prescriptions',
+        'create_prescriptions',
+        'update_prescriptions',
+        'view_medications',
+        'create_medications',
+        'update_medications',
+        'view_pharmacy_inventory',
+        'update_pharmacy_inventory',
+      ],
+      isActive: true,
+    },
+    {
+      name: 'Lab Technician',
+      code: 'LAB_TECH',
+      description: 'Laboratory staff with lab test management permissions',
+      permissions: [
+        'view_patients',
+        'view_lab_orders',
+        'create_lab_orders',
+        'update_lab_orders',
+        'view_lab_tests',
+        'create_lab_tests',
+        'update_lab_tests',
+        'view_lab_reports',
+        'create_lab_reports',
+      ],
+      isActive: true,
+    },
+    {
+      name: 'Receptionist',
+      code: 'RECEPTIONIST',
+      description:
+        'Front desk staff with patient registration and appointment permissions',
+      permissions: [
+        'view_patients',
+        'create_patients',
+        'update_patients',
+        'view_appointments',
+        'create_appointments',
+        'update_appointments',
+        'view_billing',
+        'create_invoices',
+        'update_invoices',
+      ],
+      isActive: true,
+    },
+  ];
+
+  for (const roleData of roles) {
+    await prisma.role.create({ data: roleData });
+  }
+
+  console.log(`✅ Created ${roles.length} roles`);
+}
+
+async function seedStaffRoleAssignments() {
+  console.log('👥 Seeding staff role assignments...');
+
+  // Check if staff role assignments already exist
+  const existingAssignments = await prisma.staffRoleAssignment.count();
+  if (existingAssignments > 0) {
+    console.log(
+      `⚠️  Staff role assignments already exist (${existingAssignments}), skipping assignment creation`,
+    );
+    return;
+  }
+
+  // Get all users and roles
+  const users = await prisma.user.findMany();
+  const roles = await prisma.role.findMany();
+  const staffMembers = await prisma.staffMember.findMany();
+
+  // Create role mapping
+  const roleMap = new Map();
+  roles.forEach((role) => {
+    roleMap.set(role.code, role.id);
+  });
+
+  // Create user mapping
+  const userMap = new Map();
+  users.forEach((user) => {
+    userMap.set(user.email, user.id);
+  });
+
+  // Create staff member mapping
+  const staffMap = new Map();
+  staffMembers.forEach((staff) => {
+    staffMap.set(staff.userId, staff.id);
+  });
+
+  const assignments = [
+    {
+      userEmail: 'admin@hospital.com',
+      roleCode: 'ADMIN',
+    },
+    {
+      userEmail: 'doctor.smith@hospital.com',
+      roleCode: 'DOCTOR',
+    },
+    {
+      userEmail: 'doctor.johnson@hospital.com',
+      roleCode: 'DOCTOR',
+    },
+    {
+      userEmail: 'nurse.wilson@hospital.com',
+      roleCode: 'NURSE',
+    },
+    {
+      userEmail: 'cashier.brown@hospital.com',
+      roleCode: 'CASHIER',
+    },
+    {
+      userEmail: 'pharmacist.davis@hospital.com',
+      roleCode: 'PHARMACIST',
+    },
+    {
+      userEmail: 'lab.tech@hospital.com',
+      roleCode: 'LAB_TECH',
+    },
+  ];
+
+  for (const assignment of assignments) {
+    const userId = userMap.get(assignment.userEmail);
+    const roleId = roleMap.get(assignment.roleCode);
+    const staffMemberId = staffMap.get(userId);
+
+    if (userId && roleId && staffMemberId) {
+      await prisma.staffRoleAssignment.create({
+        data: {
+          staffMemberId,
+          roleId,
+          assignedBy: null, // No specific assigner for seed data
+        },
+      });
+    }
+  }
+
+  console.log(`✅ Created ${assignments.length} staff role assignments`);
 }
 
 async function seedPatients() {
@@ -2123,7 +2356,7 @@ async function seedCashRequests() {
     // Create cash requests based on available staff members
     const cashRequests: Array<{
       requesterId: string;
-      department: string;
+      departmentId: string;
       purpose: string;
       amount: number;
       urgency: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -2135,7 +2368,7 @@ async function seedCashRequests() {
     if (staffMembers.length > 0) {
       cashRequests.push({
         requesterId: staffMembers[0].id,
-        department: staffMembers[0].department,
+        departmentId: staffMembers[0].departmentId || 'dept_gen',
         purpose: 'Computer equipment purchase',
         amount: 250.0,
         urgency: 'HIGH',
@@ -2148,7 +2381,7 @@ async function seedCashRequests() {
     if (staffMembers.length > 1) {
       cashRequests.push({
         requesterId: staffMembers[1].id,
-        department: staffMembers[1].department,
+        departmentId: staffMembers[1].departmentId || 'dept_gen',
         purpose: 'Plumbing supplies',
         amount: 75.0,
         urgency: 'NORMAL',
@@ -2161,7 +2394,7 @@ async function seedCashRequests() {
     if (staffMembers.length > 2) {
       cashRequests.push({
         requesterId: staffMembers[2].id,
-        department: staffMembers[2].department,
+        departmentId: staffMembers[2].departmentId || 'dept_gen',
         purpose: 'Medical supplies restock',
         amount: 180.0,
         urgency: 'URGENT',
@@ -2174,7 +2407,7 @@ async function seedCashRequests() {
     if (staffMembers.length > 3) {
       cashRequests.push({
         requesterId: staffMembers[3].id,
-        department: staffMembers[3].department,
+        departmentId: staffMembers[3].departmentId || 'dept_gen',
         purpose: 'Office stationery',
         amount: 45.0,
         urgency: 'LOW',

@@ -29,13 +29,13 @@ export class QueryCashRequestDto {
   search?: string;
 
   @ApiProperty({
-    description: 'Filter by department',
-    example: 'Finance',
+    description: 'Filter by department ID',
+    example: 'dept_fin',
     required: false,
   })
   @IsOptional()
   @IsString()
-  department?: string;
+  departmentId?: string;
 
   @ApiProperty({
     description: 'Filter by urgency level',

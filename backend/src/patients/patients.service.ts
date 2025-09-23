@@ -58,7 +58,7 @@ export class PatientsService {
           password: tempPassword, // This should be hashed in production
           firstName: createPatientDto.firstName,
           lastName: createPatientDto.lastName,
-          role: 'PATIENT',
+          // role field removed - now handled through StaffRoleAssignment
           isActive: true,
         },
       });

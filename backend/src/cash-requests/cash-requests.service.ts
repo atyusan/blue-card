@@ -91,7 +91,7 @@ export class CashRequestsService {
       page = 1,
       limit = 10,
       search,
-      department,
+      departmentId,
       urgency,
       status,
       requesterId,
@@ -107,12 +107,12 @@ export class CashRequestsService {
       where.OR = [
         { requestNumber: { contains: search, mode: 'insensitive' } },
         { purpose: { contains: search, mode: 'insensitive' } },
-        { department: { contains: search, mode: 'insensitive' } },
+        { purpose: { contains: search, mode: 'insensitive' } }, // Removed department search
       ];
     }
 
-    if (department) {
-      where.department = department;
+    if (departmentId) {
+      where.departmentId = departmentId;
     }
 
     if (urgency) {

@@ -54,6 +54,15 @@ export class CreateServiceDto {
   serviceCode?: string;
 
   @ApiProperty({
+    description: 'Department ID (optional)',
+    example: 'clx1234567890abcdef',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
+
+  @ApiProperty({
     description: 'Whether the service requires pre-payment',
     example: false,
     default: false,

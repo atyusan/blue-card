@@ -8,34 +8,105 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  username    String?      @unique
-  password    String
-  firstName   String
-  lastName    String
-  role        UserRole
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  auditLogs   AuditLog[]
-  patient     Patient?
-  staffMember StaffMember?
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  username             String?               @unique
+  password             String
+  firstName            String
+  lastName             String
+  permissions          Json? // Array of permission strings for direct user permissions
+  // role field removed - now handled through StaffRoleAssignment
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  auditLogs            AuditLog[]
+  patient              Patient?
+  staffMember          StaffMember?
+  temporaryPermissions TemporaryPermission[]
+  permissionRequests   PermissionRequest[]
+  permissionApprovals  PermissionApprover[]
+  permissionAudits     PermissionAudit[]
 
   @@map("users")
 }
 
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  staffMembers StaffMember[]
+  services     Service[]
+  cashRequests CashRequest[]
+
+  @@map("departments")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  permissions Json? // Array of permission strings
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  staffRoleAssignments StaffRoleAssignment[]
+
+  @@map("roles")
+}
+
+model StaffRoleAssignment {
+  id            String    @id @default(cuid())
+  staffMemberId String
+  roleId        String
+  assignedBy    String? // Staff member who assigned the role
+  assignedAt    DateTime  @default(now())
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  scope         String    @default("GLOBAL") // GLOBAL, DEPARTMENT, SERVICE, PATIENT
+  scopeId       String? // ID of the scoped entity (department, service, patient)
+  conditions    Json? // Array of role conditions
+  metadata      Json? // Additional context data
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  staffMember     StaffMember  @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  role            Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedByStaff StaffMember? @relation("RoleAssignments", fields: [assignedBy], references: [id])
+
+  @@unique([staffMemberId, roleId, scope, scopeId])
+  @@map("staff_role_assignments")
+}
+
 model StaffMember {
-  id                        String            @id @default(cuid())
-  userId                    String            @unique
-  employeeId                String            @unique
-  department                String
-  specialization            String?
-  licenseNumber             String?
-  hireDate                  DateTime
-  isActive                  Boolean           @default(true)
-  createdAt                 DateTime          @default(now())
-  updatedAt                 DateTime          @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  employeeId     String   @unique
+  departmentId   String? // Changed from department string to foreign key
+  department     String // Keep for backward compatibility during migration
+  specialization String?
+  licenseNumber  String?
+  hireDate       DateTime
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  departmentRef               Department?           @relation(fields: [departmentId], references: [id])
+  roleAssignments             StaffRoleAssignment[]
+  roleAssignmentsGiven        StaffRoleAssignment[] @relation("RoleAssignments")
+  temporaryPermissionsGranted TemporaryPermission[]
+
+  // Existing relations
   admissions                Admission[]
   cashTransactions          CashTransaction[]
   consultations             Consultation[]
@@ -138,6 +209,7 @@ model Service {
   name               String
   description        String?
   categoryId         String
+  departmentId       String? // New field for department association
   basePrice          Decimal         @db.Decimal(10, 2)
   currentPrice       Decimal         @db.Decimal(10, 2)
   serviceCode        String?
@@ -149,6 +221,7 @@ model Service {
   dailyCharges       DailyCharge[]
   labTests           LabTest[]
   category           ServiceCategory @relation(fields: [categoryId], references: [id])
+  department         Department?     @relation(fields: [departmentId], references: [id])
 
   @@map("services")
 }
@@ -553,7 +626,7 @@ model CashRequest {
   id              String         @id @default(cuid())
   requestNumber   String         @unique // Auto-generated: CR-YYYYMMDD-001
   requesterId     String // Staff member requesting
-  department      String // Department making request
+  departmentId    String // Department making request
   purpose         String // Reason for cash request
   amount          Decimal        @db.Decimal(10, 2)
   urgency         RequestUrgency @default(NORMAL)
@@ -573,6 +646,7 @@ model CashRequest {
   approver         StaffMember?      @relation("CashRequestApprover", fields: [approvedBy], references: [id])
   rejector         StaffMember?      @relation("CashRequestRejector", fields: [rejectedBy], references: [id])
   cashTransactions CashTransaction[] // One request can have multiple transactions
+  department       Department        @relation(fields: [departmentId], references: [id])
 
   @@map("cash_requests")
 }
@@ -933,17 +1007,7 @@ enum PaystackInvoiceStatus {
   CANCELLED
 }
 
-enum UserRole {
-  ADMIN
-  DOCTOR
-  NURSE
-  LAB_TECHNICIAN
-  PHARMACIST
-  CASHIER
-  RECEPTIONIST
-  ACCOUNTANT
-  PATIENT
-}
+// UserRole enum removed - now handled through Role model and StaffRoleAssignment
 
 enum Gender {
   MALE
@@ -1283,4 +1347,199 @@ enum TimeOffStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum PermissionRequestUrgency {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PermissionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum PermissionApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ABSTAINED
+}
+
+enum PermissionRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PermissionAuditLevel {
+  BASIC
+  STANDARD
+  DETAILED
+  COMPREHENSIVE
+}
+
+model PermissionTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  category    String
+  permissions Json // Array of permission strings
+  isSystem    Boolean  @default(false)
+  version     String   @default("1.0.0")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  presets PermissionPreset[]
+
+  @@map("permission_templates")
+}
+
+model PermissionPreset {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String?
+  templateId     String
+  customizations Json // Array of PermissionCustomization objects
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  template PermissionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("permission_presets")
+}
+
+model TemporaryPermission {
+  id         String   @id @default(cuid())
+  userId     String
+  permission String
+  grantedBy  String
+  grantedAt  DateTime @default(now())
+  expiresAt  DateTime
+  reason     String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedByStaff StaffMember            @relation(fields: [grantedBy], references: [id])
+  auditTrail     PermissionAuditEntry[]
+
+  @@map("temporary_permissions")
+}
+
+model PermissionAuditEntry {
+  id          String   @id @default(cuid())
+  action      String // GRANTED, REVOKED, EXPIRED, EXTENDED
+  timestamp   DateTime @default(now())
+  performedBy String
+  reason      String?
+  metadata    Json? // Additional context data
+
+  // Relations
+  temporaryPermissionId String?
+  temporaryPermission   TemporaryPermission? @relation(fields: [temporaryPermissionId], references: [id], onDelete: Cascade)
+
+  @@map("permission_audit_entries")
+}
+
+model PermissionRequest {
+  id          String                   @id @default(cuid())
+  requesterId String
+  permission  String
+  reason      String
+  urgency     PermissionRequestUrgency @default(NORMAL)
+  status      PermissionRequestStatus  @default(PENDING)
+  requestedAt DateTime                 @default(now())
+  expiresAt   DateTime?
+  attachments Json? // Array of attachment metadata
+  metadata    Json? // Additional request context
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  // Relations
+  requester User                 @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  approvers PermissionApprover[]
+
+  @@map("permission_requests")
+}
+
+model PermissionApprover {
+  id                  String                   @id @default(cuid())
+  permissionRequestId String
+  userId              String
+  role                String // APPROVER, FINAL_APPROVER, etc.
+  status              PermissionApprovalStatus @default(PENDING)
+  required            Boolean                  @default(true)
+  comments            String?
+  approvedAt          DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  // Relations
+  permissionRequest PermissionRequest @relation(fields: [permissionRequestId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([permissionRequestId, userId])
+  @@map("permission_approvers")
+}
+
+model PermissionWorkflow {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  steps       Json // Array of workflow step configurations
+  isActive    Boolean  @default(true)
+  version     String   @default("1.0.0")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("permission_workflows")
+}
+
+model PermissionSecurity {
+  permission         String               @id
+  riskLevel          PermissionRiskLevel  @default(MEDIUM)
+  requiresMFA        Boolean              @default(false)
+  requiresApproval   Boolean              @default(true)
+  maxDuration        Int? // Maximum duration in hours for temporary grants
+  allowedIPs         Json? // Array of allowed IP addresses
+  allowedDevices     Json? // Array of allowed device identifiers
+  allowedTimeWindows Json? // Array of allowed time windows
+  auditLevel         PermissionAuditLevel @default(STANDARD)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@map("permission_security")
+}
+
+model PermissionAudit {
+  id         String   @id @default(cuid())
+  userId     String
+  permission String
+  action     String // ACCESSED, DENIED, GRANTED, REVOKED
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  location   String?
+  deviceId   String?
+  sessionId  String?
+  metadata   Json? // Additional audit context
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("permission_audits")
 }

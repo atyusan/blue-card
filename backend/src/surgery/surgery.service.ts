@@ -9,10 +9,14 @@ import { CreateSurgeryDto } from './dto/create-surgery.dto';
 import { UpdateSurgeryDto } from './dto/update-surgery.dto';
 import { CreateSurgicalProcedureDto } from './dto/create-surgical-procedure.dto';
 import { CreateOperatingRoomBookingDto } from './dto/create-operating-room-booking.dto';
+import { UserPermissionsService } from '../users/user-permissions.service';
 
 @Injectable()
 export class SurgeryService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
   // Helper method to get or create surgery category
   private async getOrCreateSurgeryCategory() {
@@ -53,8 +57,18 @@ export class SurgeryService {
       include: { user: true },
     });
 
-    if (!surgeon || !['DOCTOR', 'SURGEON'].includes(surgeon.user.role)) {
-      throw new NotFoundException('Surgeon not found or not authorized');
+    if (!surgeon) {
+      throw new NotFoundException('Surgeon not found');
+    }
+
+    // Check if surgeon has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      surgeon.userId,
+      ['perform_surgery', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException('Surgeon not authorized');
     }
 
     // Check if anesthesiologist exists if provided
@@ -64,13 +78,18 @@ export class SurgeryService {
         include: { user: true },
       });
 
-      if (
-        !anesthesiologist ||
-        !['DOCTOR', 'ANESTHESIOLOGIST'].includes(anesthesiologist.user.role)
-      ) {
-        throw new NotFoundException(
-          'Anesthesiologist not found or not authorized',
-        );
+      if (!anesthesiologist) {
+        throw new NotFoundException('Anesthesiologist not found');
+      }
+
+      // Check if anesthesiologist has required permissions
+      const hasPermission = await this.userPermissionsService.hasAnyPermission(
+        anesthesiologist.userId,
+        ['administer_anesthesia', 'admin'],
+      );
+
+      if (!hasPermission) {
+        throw new ForbiddenException('Anesthesiologist not authorized');
       }
     }
 

@@ -44,6 +44,8 @@ import {
   Print,
   Download,
   Cancel,
+  ArrowUpward,
+  ArrowDownward,
 } from '@mui/icons-material';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -75,6 +77,8 @@ const BillingPage: React.FC = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Query parameters
   const queryParams = useMemo(
@@ -83,8 +87,10 @@ const BillingPage: React.FC = () => {
       limit: rowsPerPage,
       search: searchQuery || undefined,
       status: statusFilter || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
     }),
-    [page, rowsPerPage, searchQuery, statusFilter]
+    [page, rowsPerPage, searchQuery, statusFilter, sortBy, sortOrder]
   );
 
   // Fetch invoices
@@ -153,7 +159,6 @@ const BillingPage: React.FC = () => {
       setSelectedInvoice(null);
     },
     onError: (error) => {
-      console.error('Delete invoice error:', error);
       toast.error('Failed to delete invoice');
     },
   });
@@ -170,7 +175,6 @@ const BillingPage: React.FC = () => {
       setSelectedInvoice(null);
     },
     onError: (error) => {
-      console.error('Cancel invoice error:', error);
       toast.error('Failed to cancel invoice');
     },
   });
@@ -196,7 +200,6 @@ const BillingPage: React.FC = () => {
       handleActionMenuClose(); // Close the action menu after successful payment
     },
     onError: (error) => {
-      console.error('Process payment error:', error);
       toast.error('Failed to process payment');
     },
   });
@@ -205,6 +208,16 @@ const BillingPage: React.FC = () => {
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
     setPage(0); // Reset to first page when searching
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+    setPage(0); // Reset to first page when sorting
   };
 
   const handlePageChange = (_event: unknown, newPage: number) => {
@@ -296,8 +309,34 @@ const BillingPage: React.FC = () => {
         toast.success('Invoice PDF downloaded for printing');
       }
     } catch (error) {
-      console.error('Print invoice error:', error);
       toast.error('Failed to generate invoice for printing');
+    }
+
+    handleActionMenuClose();
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!selectedInvoice) return;
+
+    try {
+      toast.loading('Generating PDF...');
+      const blob = await invoiceService.generateInvoicePDF(selectedInvoice.id);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `invoice-${
+        selectedInvoice.invoiceNumber || selectedInvoice.number
+      }.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Invoice PDF downloaded successfully');
+    } catch (error) {
+      toast.error('Failed to download invoice PDF');
     }
 
     handleActionMenuClose();
@@ -362,15 +401,19 @@ const BillingPage: React.FC = () => {
   const getStatusColor = (
     status: string
   ): 'success' | 'warning' | 'error' | 'default' => {
-    switch (status?.toLowerCase()) {
-      case 'paid':
+    switch (status) {
+      case 'PAID':
         return 'success';
-      case 'pending':
+      case 'PENDING':
         return 'warning';
-      case 'overdue':
+      case 'OVERDUE':
         return 'error';
-      case 'cancelled':
+      case 'CANCELLED':
         return 'default';
+      case 'DRAFT':
+        return 'default';
+      case 'PARTIAL':
+        return 'warning';
       default:
         return 'default';
     }
@@ -463,20 +506,22 @@ const BillingPage: React.FC = () => {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <MenuItem value=''>All</MenuItem>
-                <MenuItem value='pending'>Pending</MenuItem>
-                <MenuItem value='paid'>Paid</MenuItem>
-                <MenuItem value='overdue'>Overdue</MenuItem>
-                <MenuItem value='cancelled'>Cancelled</MenuItem>
+                <MenuItem value='DRAFT'>Draft</MenuItem>
+                <MenuItem value='PENDING'>Pending</MenuItem>
+                <MenuItem value='PARTIAL'>Partial</MenuItem>
+                <MenuItem value='PAID'>Paid</MenuItem>
+                <MenuItem value='OVERDUE'>Overdue</MenuItem>
+                <MenuItem value='CANCELLED'>Cancelled</MenuItem>
               </Select>
             </FormControl>
             <Button
               variant='outlined'
               startIcon={<FilterList />}
               onClick={() => {
-                /* Open filter dialog */
+                // Additional filters can be added here
               }}
             >
-              Filter
+              More Filters
             </Button>
           </Box>
         </Box>
@@ -488,12 +533,90 @@ const BillingPage: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Invoice</TableCell>
-                <TableCell>Patient</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Due Date</TableCell>
-                <TableCell>Created</TableCell>
+                <TableCell
+                  onClick={() => handleSort('invoiceNumber')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Invoice
+                    {sortBy === 'invoiceNumber' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('patientName')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Patient
+                    {sortBy === 'patientName' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('totalAmount')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Amount
+                    {sortBy === 'totalAmount' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('status')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Status
+                    {sortBy === 'status' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('dueDate')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Due Date
+                    {sortBy === 'dueDate' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('createdAt')}
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Created
+                    {sortBy === 'createdAt' &&
+                      (sortOrder === 'asc' ? (
+                        <ArrowUpward fontSize='small' />
+                      ) : (
+                        <ArrowDownward fontSize='small' />
+                      ))}
+                  </Box>
+                </TableCell>
                 <TableCell align='right'>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -674,7 +797,7 @@ const BillingPage: React.FC = () => {
           </ListItemIcon>
           Print Invoice
         </MenuItem>
-        <MenuItem>
+        <MenuItem onClick={handleDownloadPDF}>
           <ListItemIcon>
             <Download fontSize='small' sx={{ mr: 1 }} />
           </ListItemIcon>

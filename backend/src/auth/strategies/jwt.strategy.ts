@@ -41,19 +41,40 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Get staff member information if it exists
     const staffMember = await this.prisma.staffMember.findFirst({
       where: { userId: user.id },
-      select: { id: true, employeeId: true, department: true },
+      select: {
+        id: true,
+        employeeId: true,
+        departmentId: true,
+        departmentRef: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
     });
+
+    // Get user with permissions
+    const userWithPermissions = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { permissions: true },
+    });
+
+    // Get user permissions (aggregated from roles + direct permissions)
+    const userPermissions =
+      (userWithPermissions?.permissions as string[]) || [];
 
     return {
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
       staffMemberId: staffMember?.id,
       employeeId: staffMember?.employeeId,
-      department: staffMember?.department,
+      department: staffMember?.departmentRef,
+      permissions: userPermissions,
     };
   }
 }

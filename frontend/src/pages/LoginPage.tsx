@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import toast from 'react-hot-toast';
+import { useToast } from '../context/ToastContext';
 import {
   Box,
   Card,
@@ -14,6 +14,12 @@ import {
   InputAdornment,
   IconButton,
   Alert,
+  Container,
+  Paper,
+  Fade,
+  LinearProgress,
+  Divider,
+  Chip,
 } from '@mui/material';
 import {
   Visibility,
@@ -21,6 +27,9 @@ import {
   Email,
   Lock,
   MedicalServices,
+  Login as LoginIcon,
+  Security,
+  HealthAndSafety,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import type { LoginFormData } from '../types';
@@ -37,6 +46,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, error, clearError } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,14 +66,14 @@ const LoginPage: React.FC = () => {
       setIsSubmitting(true);
       clearError();
 
-      await login(data);
+      await login(data.username, data.password);
 
-      toast.success('Login successful!');
+      showSuccess('Login successful!');
       navigate(from, { replace: true });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Login failed';
-      toast.error(errorMessage);
+      showError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -74,118 +84,273 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <Box className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4'>
-      <Card className='w-full max-w-md shadow-xl'>
-        <CardContent className='p-8'>
-          {/* Header */}
-          <Box className='text-center mb-8'>
-            <Box className='flex justify-center mb-4'>
-              <MedicalServices className='text-6xl text-primary-600' />
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Background Pattern */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          opacity: 0.3,
+        }}
+      />
+
+      <Container maxWidth='sm'>
+        <Fade in timeout={800}>
+          <Paper
+            elevation={24}
+            sx={{
+              borderRadius: 3,
+              overflow: 'hidden',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+            }}
+          >
+            {/* Header Section */}
+            <Box
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                p: 4,
+                textAlign: 'center',
+                position: 'relative',
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                }}
+              />
+              <Box sx={{ position: 'relative', zIndex: 1 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    mb: 2,
+                    gap: 1,
+                  }}
+                >
+                  <HealthAndSafety sx={{ fontSize: 40 }} />
+                  <MedicalServices sx={{ fontSize: 40 }} />
+                </Box>
+                <Typography
+                  variant='h4'
+                  component='h1'
+                  sx={{
+                    fontWeight: 700,
+                    mb: 1,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  Blue Card Hospital
+                </Typography>
+                <Typography variant='body1' sx={{ opacity: 0.9 }}>
+                  Secure Access Portal
+                </Typography>
+              </Box>
             </Box>
-            <Typography
-              variant='h4'
-              component='h1'
-              className='font-bold text-gray-900 mb-2'
-            >
-              Welcome Back
-            </Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Sign in to your Hospital Billing System account
-            </Typography>
-          </Box>
 
-          {/* Error Alert */}
-          {error && (
-            <Alert severity='error' className='mb-4' onClose={clearError}>
-              {error}
-            </Alert>
-          )}
+            <CardContent sx={{ p: 4 }}>
+              {/* Welcome Message */}
+              <Box sx={{ textAlign: 'center', mb: 4 }}>
+                <Typography
+                  variant='h5'
+                  component='h2'
+                  sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}
+                >
+                  Welcome Back
+                </Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Sign in to access your hospital management system
+                </Typography>
+              </Box>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
-            <TextField
-              {...register('username')}
-              fullWidth
-              label='Username'
-              type='text'
-              variant='outlined'
-              error={!!errors.username}
-              helperText={errors.username?.message}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <Email className='text-gray-400' />
-                  </InputAdornment>
-                ),
-              }}
-              className='mb-4'
-            />
+              {/* Error Alert */}
+              {error && (
+                <Fade in>
+                  <Alert
+                    severity='error'
+                    sx={{ mb: 3 }}
+                    onClose={clearError}
+                    icon={<Security />}
+                  >
+                    {error}
+                  </Alert>
+                </Fade>
+              )}
 
-            <TextField
-              {...register('password')}
-              fullWidth
-              label='Password'
-              type={showPassword ? 'text' : 'password'}
-              variant='outlined'
-              error={!!errors.password}
-              helperText={errors.password?.message}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position='start'>
-                    <Lock className='text-gray-400' />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position='end'>
-                    <IconButton
-                      onClick={togglePasswordVisibility}
-                      edge='end'
-                      size='small'
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              className='mb-6'
-            />
+              {/* Login Form */}
+              <form onSubmit={handleSubmit(onSubmit)}>
+                <Box sx={{ mb: 3 }}>
+                  <TextField
+                    {...register('username')}
+                    fullWidth
+                    label='Username or Email'
+                    type='text'
+                    variant='outlined'
+                    error={!!errors.username}
+                    helperText={errors.username?.message}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <Email sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      },
+                    }}
+                  />
+                </Box>
 
-            <Button
-              type='submit'
-              fullWidth
-              variant='contained'
-              size='large'
-              disabled={isSubmitting}
-              className='h-12 text-lg font-semibold'
-            >
-              {isSubmitting ? 'Signing In...' : 'Sign In'}
-            </Button>
-          </form>
+                <Box sx={{ mb: 4 }}>
+                  <TextField
+                    {...register('password')}
+                    fullWidth
+                    label='Password'
+                    type={showPassword ? 'text' : 'password'}
+                    variant='outlined'
+                    error={!!errors.password}
+                    helperText={errors.password?.message}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <Lock sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <InputAdornment position='end'>
+                          <IconButton
+                            onClick={togglePasswordVisibility}
+                            edge='end'
+                            size='small'
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      },
+                    }}
+                  />
+                </Box>
 
-          {/* Forgot Password Link */}
-          <Box className='text-center mt-4'>
-            <Link
-              to='/forgot-password'
-              className='text-blue-600 hover:text-blue-800 text-sm font-medium'
-            >
-              Forgot your password?
-            </Link>
-          </Box>
+                {/* Loading Progress */}
+                {isSubmitting && (
+                  <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />
+                )}
 
-          {/* Footer */}
-          <Box className="text-center mt-6">
-            <Typography variant="body2" color="text.secondary">
-              Demo Credentials:
-            </Typography>
-            <Typography
-              variant="body2"
-              className="font-mono text-xs text-gray-600 mt-1"
-            >
-              admin / admin123
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+                <Button
+                  type='submit'
+                  fullWidth
+                  variant='contained'
+                  size='large'
+                  disabled={isSubmitting}
+                  startIcon={<LoginIcon />}
+                  sx={{
+                    height: 48,
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    background:
+                      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background:
+                        'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                    },
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                  }}
+                >
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
+                </Button>
+              </form>
+
+              <Divider sx={{ my: 3 }}>
+                <Chip label='or' size='small' />
+              </Divider>
+
+              {/* Forgot Password Link */}
+              <Box sx={{ textAlign: 'center', mb: 3 }}>
+                <Link
+                  to='/forgot-password'
+                  style={{
+                    color: '#667eea',
+                    textDecoration: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  Forgot your password?
+                </Link>
+              </Box>
+
+              {/* Demo Credentials */}
+              <Paper
+                variant='outlined'
+                sx={{
+                  p: 2,
+                  backgroundColor: 'grey.50',
+                  border: '1px solid',
+                  borderColor: 'grey.200',
+                }}
+              >
+                <Typography
+                  variant='caption'
+                  color='text.secondary'
+                  sx={{ display: 'block', mb: 1, fontWeight: 600 }}
+                >
+                  Demo Credentials:
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Chip
+                    label='admin / admin123'
+                    size='small'
+                    variant='outlined'
+                    sx={{ fontFamily: 'monospace' }}
+                  />
+                  <Chip
+                    label='doctor / doctor123'
+                    size='small'
+                    variant='outlined'
+                    sx={{ fontFamily: 'monospace' }}
+                  />
+                </Box>
+              </Paper>
+            </CardContent>
+          </Paper>
+        </Fade>
+      </Container>
     </Box>
   );
 };

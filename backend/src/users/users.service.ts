@@ -42,7 +42,7 @@ export class UsersService {
         username: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -53,7 +53,7 @@ export class UsersService {
   }
 
   async findAll(query?: {
-    role?: string;
+    // role parameter removed - now handled through StaffRoleAssignment
     isActive?: boolean;
     search?: string;
     page?: number;
@@ -64,9 +64,10 @@ export class UsersService {
 
     const where: any = {};
 
-    if (filters?.role) {
-      where.role = filters.role;
-    }
+    // Role filtering removed - now handled through StaffRoleAssignment
+    // if (filters?.role) {
+    //   where.role = filters.role;
+    // }
 
     if (filters?.isActive !== undefined) {
       where.isActive = filters.isActive;
@@ -94,7 +95,7 @@ export class UsersService {
         username: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -125,7 +126,7 @@ export class UsersService {
         password: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -149,7 +150,7 @@ export class UsersService {
         password: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -166,7 +167,7 @@ export class UsersService {
         username: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -186,7 +187,7 @@ export class UsersService {
         password: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -216,7 +217,7 @@ export class UsersService {
         username: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -250,7 +251,7 @@ export class UsersService {
         username: true,
         firstName: true,
         lastName: true,
-        role: true,
+        // role field removed - now handled through StaffRoleAssignment
         isActive: true,
         createdAt: true,
         updatedAt: true,

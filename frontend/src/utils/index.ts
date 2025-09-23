@@ -236,7 +236,15 @@ export const setLocalStorage = (key: string, value: any): void => {
 export const getLocalStorage = <T>(key: string, defaultValue?: T): T | null => {
   try {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue || null;
+    if (!item) return defaultValue || null;
+
+    // Try to parse as JSON, if it fails, return as string
+    try {
+      return JSON.parse(item);
+    } catch {
+      // If JSON parsing fails, return the raw string value
+      return item as T;
+    }
   } catch (error) {
     console.error('Error reading from localStorage:', error);
     return defaultValue || null;
@@ -331,6 +339,13 @@ export const rgbToHex = (r: number, g: number, b: number): string => {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 };
 
+// Class name utility (commonly used with Tailwind CSS)
+export const cn = (
+  ...classes: (string | undefined | null | false)[]
+): string => {
+  return classes.filter(Boolean).join(' ');
+};
+
 export default {
   formatDate,
   formatDateTime,
@@ -359,4 +374,5 @@ export default {
   getErrorMessage,
   hexToRgb,
   rgbToHex,
+  cn,
 };

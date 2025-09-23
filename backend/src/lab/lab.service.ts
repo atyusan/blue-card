@@ -9,10 +9,14 @@ import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { CreateLabTestDto } from './dto/create-lab-test.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
+import { UserPermissionsService } from '../users/user-permissions.service';
 
 @Injectable()
 export class LabService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
   // Lab Order Management
   async createLabOrder(createLabOrderDto: CreateLabOrderDto) {
@@ -34,10 +38,18 @@ export class LabService {
       include: { user: true },
     });
 
-    if (!doctor || !['DOCTOR', 'LAB_TECHNICIAN'].includes(doctor.user.role)) {
-      throw new NotFoundException(
-        'Doctor not found or not authorized to order lab tests',
-      );
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    // Check if doctor has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      doctor.userId,
+      ['order_lab_tests', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException('Doctor not authorized to order lab tests');
     }
 
     // Validate that all tests exist and are active

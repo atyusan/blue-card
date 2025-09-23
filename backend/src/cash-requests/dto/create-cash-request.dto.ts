@@ -19,13 +19,12 @@ export enum RequestUrgency {
 
 export class CreateCashRequestDto {
   @ApiProperty({
-    description: 'Department making the request',
-    example: 'Finance',
+    description: 'Department ID making the request',
+    example: 'dept_fin',
   })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
-  department: string;
+  departmentId: string;
 
   @ApiProperty({
     description: 'Purpose of the cash request',

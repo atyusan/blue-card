@@ -31,6 +31,12 @@ import { LoggingModule } from './logging/logging.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { RolesModule } from './roles/roles.module';
+import { PermissionTemplatesModule } from './permission-templates/permission-templates.module';
+import { TemporaryPermissionsModule } from './temporary-permissions/temporary-permissions.module';
+import { PermissionAnalyticsModule } from './permission-analytics/permission-analytics.module';
+import { PermissionRequestsModule } from './permission-requests/permission-requests.module';
 
 @Module({
   imports: [
@@ -75,6 +81,12 @@ import { NotificationsModule } from './notifications/notifications.module';
     DashboardModule,
     AppointmentsModule,
     NotificationsModule,
+    DepartmentsModule,
+    RolesModule,
+    PermissionTemplatesModule,
+    TemporaryPermissionsModule,
+    PermissionAnalyticsModule,
+    PermissionRequestsModule,
   ],
   controllers: [AppController],
   providers: [

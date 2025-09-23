@@ -9,10 +9,14 @@ import { PrismaService } from '../database/prisma.service';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto';
 import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto';
 import { CreatePettyCashDto } from './dto/create-petty-cash.dto';
+import { UserPermissionsService } from '../users/user-permissions.service';
 
 @Injectable()
 export class CashOfficeService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
   // Cash Transaction Management
   async createCashTransaction(
@@ -26,12 +30,19 @@ export class CashOfficeService {
       include: { user: true },
     });
 
-    if (
-      !cashier ||
-      !['CASHIER', 'ADMIN', 'MANAGER'].includes(cashier.user.role)
-    ) {
-      throw new NotFoundException(
-        'Cashier not found or not authorized for cash transactions',
+    if (!cashier) {
+      throw new NotFoundException('Cashier not found');
+    }
+
+    // Check if cashier has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      cashier.userId,
+      ['manage_cash_transactions', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'Cashier not authorized for cash transactions',
       );
     }
 
@@ -301,11 +312,18 @@ export class CashOfficeService {
       include: { user: true },
     });
 
-    if (
-      !approver ||
-      !['ADMIN', 'MANAGER', 'FINANCE_MANAGER'].includes(approver.user.role)
-    ) {
-      throw new NotFoundException('Approver not found or not authorized');
+    if (!approver) {
+      throw new NotFoundException('Approver not found');
+    }
+
+    // Check if approver has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      approver.userId,
+      ['approve_petty_cash', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException('Approver not authorized');
     }
 
     // Approve petty cash request
@@ -368,11 +386,18 @@ export class CashOfficeService {
       include: { user: true },
     });
 
-    if (
-      !approver ||
-      !['ADMIN', 'MANAGER', 'FINANCE_MANAGER'].includes(approver.user.role)
-    ) {
-      throw new NotFoundException('Approver not found or not authorized');
+    if (!approver) {
+      throw new NotFoundException('Approver not found');
+    }
+
+    // Check if approver has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      approver.userId,
+      ['approve_petty_cash', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException('Approver not authorized');
     }
 
     // Reject petty cash request
@@ -789,12 +814,19 @@ export class CashOfficeService {
       include: { user: true },
     });
 
-    if (
-      !cashier ||
-      !['CASHIER', 'ADMIN', 'MANAGER'].includes(cashier.user.role)
-    ) {
-      throw new NotFoundException(
-        'Cashier not found or not authorized for payment processing',
+    if (!cashier) {
+      throw new NotFoundException('Cashier not found');
+    }
+
+    // Check if cashier has required permissions
+    const hasPermission = await this.userPermissionsService.hasAnyPermission(
+      cashier.userId,
+      ['process_payments', 'admin'],
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'Cashier not authorized for payment processing',
       );
     }
 

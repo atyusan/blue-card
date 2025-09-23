@@ -1,4 +1,4 @@
-import { http } from './api';
+import { apiClient } from '../lib/api-client';
 import type {
   Invoice,
   CreateInvoiceFormData,
@@ -53,22 +53,25 @@ class InvoiceService {
       }
     });
 
-    const response = await http.get<PaginatedResponse<Invoice>>(
+    const response = await apiClient.get<PaginatedResponse<Invoice>>(
       `/billing/invoices?${queryParams.toString()}`
     );
-    return response;
+    return response.data;
   }
 
   // Get invoice by ID
   async getInvoiceById(id: string): Promise<Invoice> {
-    const response = await http.get<Invoice>(`/billing/invoices/${id}`);
-    return response;
+    const response = await apiClient.get<Invoice>(`/billing/invoices/${id}`);
+    return response.data;
   }
 
   // Create new invoice
   async createInvoice(invoiceData: CreateInvoiceFormData): Promise<Invoice> {
-    const response = await http.post<Invoice>('/billing/invoices', invoiceData);
-    return response;
+    const response = await apiClient.post<Invoice>(
+      '/billing/invoices',
+      invoiceData
+    );
+    return response.data;
   }
 
   // Update invoice
@@ -76,11 +79,11 @@ class InvoiceService {
     id: string,
     invoiceData: Partial<CreateInvoiceFormData>
   ): Promise<Invoice> {
-    const response = await http.patch<Invoice>(
+    const response = await apiClient.patch<Invoice>(
       `/billing/invoices/${id}`,
       invoiceData
     );
-    return response;
+    return response.data;
   }
 
   // Add charge to invoice
@@ -93,11 +96,11 @@ class InvoiceService {
       unitPrice: number;
     }
   ): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${invoiceId}/charges`,
       chargeData
     );
-    return response;
+    return response.data;
   }
 
   // Remove charge from invoice
@@ -105,89 +108,97 @@ class InvoiceService {
     invoiceId: string,
     chargeId: string
   ): Promise<void> {
-    await http.delete(`/billing/invoices/${invoiceId}/charges/${chargeId}`);
+    await apiClient.delete(
+      `/billing/invoices/${invoiceId}/charges/${chargeId}`
+    );
   }
 
   // Delete invoice
   async deleteInvoice(id: string): Promise<void> {
-    await http.delete(`/billing/invoices/${id}`);
+    await apiClient.delete(`/billing/invoices/${id}`);
   }
 
   // Cancel invoice
   async cancelInvoice(id: string, reason?: string): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${id}/cancel`,
       {
         reason,
       }
     );
-    return response;
+    return response.data;
   }
 
   // Get invoice statistics
   async getInvoiceStats(): Promise<InvoiceStats> {
-    const response = await http.get<InvoiceStats>('/billing/invoices/stats');
-    return response;
+    const response = await apiClient.get<InvoiceStats>(
+      '/billing/invoices/stats'
+    );
+    return response.data;
   }
 
   // Send invoice to patient
   async sendInvoice(id: string, email?: string): Promise<void> {
     const payload = email ? { email } : {};
-    await http.post(`/billing/invoices/${id}/send`, payload);
+    await apiClient.post(`/billing/invoices/${id}/send`, payload);
   }
 
   // Generate invoice PDF
   async generateInvoicePDF(id: string): Promise<Blob> {
-    const response = await http.get(`/billing/invoices/${id}/pdf`, {
+    const response = await apiClient.get(`/billing/invoices/${id}/pdf`, {
       responseType: 'blob',
     });
-    return response as unknown as Blob;
+    return response.data;
   }
 
   // Process payment for invoice
   async processPayment(id: string, paymentData: PaymentData): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${id}/payments`,
       paymentData
     );
-    return response;
+    return response.data;
   }
 
   // Get invoice payments
   async getInvoicePayments(id: string): Promise<any[]> {
-    const response = await http.get<any[]>(`/billing/invoices/${id}/payments`);
-    return response;
+    const response = await apiClient.get<any[]>(
+      `/billing/invoices/${id}/payments`
+    );
+    return response.data;
   }
 
   // Mark invoice as paid
   async markAsPaid(id: string, paymentData: PaymentData): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${id}/mark-paid`,
       paymentData
     );
-    return response;
+    return response.data;
   }
 
   // Get overdue invoices
   async getOverdueInvoices(): Promise<Invoice[]> {
-    const response = await http.get<Invoice[]>('/billing/invoices/overdue');
-    return response;
+    const response = await apiClient.get<Invoice[]>(
+      '/billing/invoices/overdue'
+    );
+    return response.data;
   }
 
   // Get recent invoices
   async getRecentInvoices(limit: number = 10): Promise<Invoice[]> {
-    const response = await http.get<Invoice[]>(
+    const response = await apiClient.get<Invoice[]>(
       `/billing/invoices/recent?limit=${limit}`
     );
-    return response;
+    return response.data;
   }
 
   // Duplicate invoice
   async duplicateInvoice(id: string): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${id}/duplicate`
     );
-    return response;
+    return response.data;
   }
 
   // Apply discount to invoice
@@ -195,26 +206,26 @@ class InvoiceService {
     id: string,
     discount: { type: 'percentage' | 'fixed'; value: number; reason?: string }
   ): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/${id}/discount`,
       discount
     );
-    return response;
+    return response.data;
   }
 
   // Get invoice templates
   async getInvoiceTemplates(): Promise<any[]> {
-    const response = await http.get<any[]>('/billing/invoices/templates');
-    return response;
+    const response = await apiClient.get<any[]>('/billing/invoices/templates');
+    return response.data;
   }
 
   // Create invoice from template
   async createFromTemplate(templateId: string, data: any): Promise<Invoice> {
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       `/billing/invoices/templates/${templateId}`,
       data
     );
-    return response;
+    return response.data;
   }
 
   // Process refund for payment
@@ -227,19 +238,19 @@ class InvoiceService {
       notes?: string;
     }
   ): Promise<any> {
-    const response = await http.post<any>(
+    const response = await apiClient.post<any>(
       `/billing/payments/${paymentId}/refunds`,
       refundData
     );
-    return response;
+    return response.data;
   }
 
   // Get billing analytics
   async getBillingAnalytics(startDate: string, endDate: string): Promise<any> {
-    const response = await http.get<any>(
+    const response = await apiClient.get<any>(
       `/billing/analytics?startDate=${startDate}&endDate=${endDate}`
     );
-    return response;
+    return response.data;
   }
 
   // Paystack Integration Endpoints
@@ -248,31 +259,33 @@ class InvoiceService {
     lineItems?: Array<{ name: string; amount: number; quantity: number }>
   ): Promise<Invoice> {
     const payload = { ...invoiceData, lineItems };
-    const response = await http.post<Invoice>(
+    const response = await apiClient.post<Invoice>(
       '/billing/paystack/invoices',
       payload
     );
-    return response;
+    return response.data;
   }
 
   async getPaystackInvoices(
     page: number = 1,
     limit: number = 20
   ): Promise<any> {
-    const response = await http.get<any>(
+    const response = await apiClient.get<any>(
       `/billing/paystack/invoices?page=${page}&limit=${limit}`
     );
-    return response;
+    return response.data;
   }
 
   async getPaystackInvoiceDetails(id: string): Promise<any> {
-    const response = await http.get<any>(`/billing/paystack/invoices/${id}`);
-    return response;
+    const response = await apiClient.get<any>(
+      `/billing/paystack/invoices/${id}`
+    );
+    return response.data;
   }
 
   async getPaystackPaymentStats(): Promise<any> {
-    const response = await http.get<any>('/billing/paystack/stats');
-    return response;
+    const response = await apiClient.get<any>('/billing/paystack/stats');
+    return response.data;
   }
 }
 

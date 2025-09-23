@@ -33,12 +33,15 @@ import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
 import { dashboardService } from '../services/dashboard.service';
 import { formatCurrency, formatDate } from '../utils';
-import toast from 'react-hot-toast';
+import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
 
-  // Fetch dashboard data
+  // Fetch dashboard data only when user is authenticated
   const {
     data: dashboardData,
     isLoading,
@@ -48,14 +51,15 @@ const DashboardPage: React.FC = () => {
     queryKey: ['dashboard'],
     queryFn: dashboardService.getDashboardData,
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    enabled: !!user && !authLoading, // Only run when user is authenticated and auth is not loading
   });
 
   const handleRefresh = async () => {
     try {
       await refetch();
-      toast.success('Dashboard refreshed successfully');
+      showSuccess('Dashboard refreshed successfully');
     } catch (_error) {
-      toast.error('Failed to refresh dashboard');
+      showError('Failed to refresh dashboard');
     }
   };
 
@@ -72,9 +76,9 @@ const DashboardPage: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success('Dashboard report downloaded successfully');
+      showSuccess('Dashboard report downloaded successfully');
     } catch (_error) {
-      toast.error('Failed to download dashboard report');
+      showError('Failed to download dashboard report');
     }
   };
 
@@ -96,6 +100,29 @@ const DashboardPage: React.FC = () => {
         break;
     }
   };
+
+  // Authentication loading state
+  if (authLoading) {
+    return (
+      <Box>
+        <PageHeader
+          title='Dashboard'
+          subtitle="Welcome back! Here's what's happening with your hospital today."
+          breadcrumbs={<Breadcrumb />}
+          showActions={false}
+        />
+        <Box className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8'>
+          {[...Array(4)].map((_, index) => (
+            <Card key={index}>
+              <CardContent className='p-6'>
+                <Skeleton variant='rectangular' height={120} />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      </Box>
+    );
+  }
 
   // Loading state
   if (isLoading) {
@@ -121,7 +148,7 @@ const DashboardPage: React.FC = () => {
   }
 
   // Error state
-  if (isError || !dashboardData) {
+  if (isError) {
     return (
       <Box>
         <PageHeader
@@ -140,6 +167,57 @@ const DashboardPage: React.FC = () => {
           }
         >
           Failed to load dashboard data. Please try again.
+        </Alert>
+      </Box>
+    );
+  }
+
+  // No data state (but not an error)
+  if (!dashboardData) {
+    return (
+      <Box>
+        <PageHeader
+          title='Dashboard'
+          subtitle="Welcome back! Here's what's happening with your hospital today."
+          breadcrumbs={<Breadcrumb />}
+          onRefresh={handleRefresh}
+          showActions={true}
+        />
+        <Alert
+          severity='info'
+          action={
+            <Button color='inherit' size='small' onClick={handleRefresh}>
+              Retry
+            </Button>
+          }
+        >
+          No dashboard data available. Please try again.
+        </Alert>
+      </Box>
+    );
+  }
+
+  // Safety check for dashboard data structure
+  if (!dashboardData.stats) {
+    console.error('🔍 Dashboard data missing stats:', dashboardData);
+    return (
+      <Box>
+        <PageHeader
+          title='Dashboard'
+          subtitle="Welcome back! Here's what's happening with your hospital today."
+          breadcrumbs={<Breadcrumb />}
+          onRefresh={handleRefresh}
+          showActions={true}
+        />
+        <Alert
+          severity='warning'
+          action={
+            <Button color='inherit' size='small' onClick={handleRefresh}>
+              Retry
+            </Button>
+          }
+        >
+          Dashboard data structure is invalid. Please try again.
         </Alert>
       </Box>
     );
@@ -364,23 +442,13 @@ const DashboardPage: React.FC = () => {
                         </ListItemIcon>
                         <ListItemText
                           primary={activity.title}
-                          secondary={
-                            <Box className='flex items-center justify-between'>
-                              <Typography
-                                variant='body2'
-                                color='text.secondary'
-                              >
-                                {activity.description}
-                              </Typography>
-                              <Typography
-                                variant='caption'
-                                color='text.secondary'
-                              >
-                                {formatDate(activity.timestamp)}
-                              </Typography>
-                            </Box>
-                          }
+                          secondary={activity.description}
                         />
+                        <Box className='flex items-center justify-end mt-1'>
+                          <Typography variant='caption' color='text.secondary'>
+                            {formatDate(activity.timestamp)}
+                          </Typography>
+                        </Box>
                       </ListItem>
                     ))}
                 </List>
@@ -465,24 +533,17 @@ const DashboardPage: React.FC = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary={appointment.patientName}
-                            secondary={
-                              <Box>
-                                <Typography
-                                  variant='body2'
-                                  color='text.secondary'
-                                >
-                                  {appointment.serviceName}
-                                </Typography>
-                                <Typography
-                                  variant='caption'
-                                  color='text.secondary'
-                                >
-                                  {formatDate(appointment.appointmentDate)} at{' '}
-                                  {appointment.appointmentTime}
-                                </Typography>
-                              </Box>
-                            }
+                            secondary={appointment.serviceName}
                           />
+                          <Box className='flex flex-col items-end mt-1'>
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                            >
+                              {formatDate(appointment.appointmentDate)} at{' '}
+                              {appointment.appointmentTime}
+                            </Typography>
+                          </Box>
                           <Chip
                             label={appointment.status}
                             size='small'
@@ -533,20 +594,13 @@ const DashboardPage: React.FC = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary={`Invoice #${invoice.number}`}
-                            secondary={
-                              <Box>
-                                <Typography
-                                  variant='body2'
-                                  color='text.secondary'
-                                >
-                                  {invoice.patientName}
-                                </Typography>
-                                <Typography variant='caption' color='error'>
-                                  Due: {formatDate(invoice.dueDate)}
-                                </Typography>
-                              </Box>
-                            }
+                            secondary={invoice.patientName}
                           />
+                          <Box className='flex flex-col items-end mt-1'>
+                            <Typography variant='caption' color='error'>
+                              Due: {formatDate(invoice.dueDate)}
+                            </Typography>
+                          </Box>
                           <Typography
                             variant='body2'
                             color='error'
