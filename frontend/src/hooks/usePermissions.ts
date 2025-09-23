@@ -1,4 +1,5 @@
 import { useAuth } from '@/context/AuthContext';
+import { useCallback } from 'react';
 
 export const usePermissions = () => {
   const context = useAuth();
@@ -9,15 +10,18 @@ export const usePermissions = () => {
 
   const { user } = context;
 
-  const hasPermission = (permission: string): boolean => {
-    if (!user || !user.permissions) return false;
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      if (!user || !user.permissions) return false;
 
-    // Check if user has admin access
-    if (user.permissions.includes('admin')) return true;
+      // Check if user has admin access
+      if (user.permissions.includes('admin')) return true;
 
-    // Check for specific permission
-    return user.permissions.includes(permission);
-  };
+      // Check for specific permission
+      return user.permissions.includes(permission);
+    },
+    [user]
+  );
 
   const hasAnyPermission = (permissions: string[]): boolean => {
     if (!user || !user.permissions) return false;
@@ -48,19 +52,19 @@ export const usePermissions = () => {
     return user.permissions;
   };
 
-  const isAdmin = (): boolean => {
+  const isAdmin = useCallback((): boolean => {
     if (!user || !user.permissions) return false;
     return user.permissions.includes('admin');
-  };
+  }, [user]);
 
   // Specific permission check methods
-  const canViewDepartments = (): boolean => {
+  const canViewDepartments = useCallback((): boolean => {
     return (
       hasPermission('view_departments') ||
       hasPermission('manage_departments') ||
       isAdmin()
     );
-  };
+  }, [hasPermission, isAdmin]);
 
   const canViewPermissionAnalytics = (): boolean => {
     return (
@@ -112,6 +116,14 @@ export const usePermissions = () => {
     );
   };
 
+  const canManageDepartments = useCallback((): boolean => {
+    return (
+      hasPermission('manage_departments') ||
+      hasPermission('system_configuration') ||
+      isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -119,6 +131,7 @@ export const usePermissions = () => {
     getUserPermissions,
     isAdmin,
     canViewDepartments,
+    canManageDepartments,
     canViewPermissionAnalytics,
     canViewRoles,
     canViewPermissionTemplates,

@@ -18,6 +18,7 @@ import {
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { DepartmentsQueryDto } from './dto/departments-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('departments')
@@ -47,7 +48,7 @@ export class DepartmentsController {
     status: 200,
     description: 'List of departments retrieved successfully',
   })
-  findAll(@Query() query: { isActive?: boolean; search?: string }) {
+  findAll(@Query() query: DepartmentsQueryDto) {
     return this.departmentsService.findAll(query);
   }
 

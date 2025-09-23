@@ -35,9 +35,17 @@ export class DepartmentsService {
     return department;
   }
 
-  async findAll(query?: { isActive?: boolean; search?: string }) {
+  async findAll(query?: {
+    isActive?: boolean;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }) {
     const where: any = {};
 
+    // Handle isActive filter
     if (query?.isActive !== undefined) {
       where.isActive = query.isActive;
     }
@@ -50,10 +58,61 @@ export class DepartmentsService {
       ];
     }
 
-    return this.prisma.department.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
+    // Handle sorting
+    const orderBy: any = {};
+    if (query?.sortBy) {
+      orderBy[query.sortBy] = query.sortOrder || 'asc';
+    } else {
+      orderBy.name = 'asc'; // Default sorting
+    }
+
+    // Handle pagination
+    const page = query?.page || 1;
+    const limit = query?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [departments, total, totalDepartments, activeDepartments] =
+      await Promise.all([
+        this.prisma.department.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          include: {
+            _count: {
+              select: {
+                staffMembers: true,
+                services: true,
+              },
+            },
+            staffMembers: {
+              select: {
+                id: true,
+              },
+            },
+            services: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        }),
+        this.prisma.department.count({ where }),
+        this.prisma.department.count(),
+        this.prisma.department.count({ where: { isActive: true } }),
+      ]);
+
+    return {
+      data: departments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      counts: {
+        totalDepartments,
+        activeDepartments,
+      },
+    };
   }
 
   async findById(id: string) {

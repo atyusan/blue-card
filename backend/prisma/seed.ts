@@ -70,6 +70,7 @@ async function main() {
   // Seed data in order of dependencies
   await seedUsers();
   await seedRoles();
+  await seedDepartments();
   await seedStaffMembers();
   await seedStaffRoleAssignments();
   await seedPatients();
@@ -247,11 +248,8 @@ async function seedPatientAccounts() {
   console.log('💰 Seeding patient accounts...');
 
   const patients = await prisma.patient.findMany();
-  // Role filtering removed - now handled through StaffRoleAssignment
-  // const existingUsers = await prisma.user.findMany({
-  //   where: { role: 'PATIENT' },
-  // });
-  const existingUsers: any[] = [];
+  // Get all existing users to check for duplicates
+  const existingUsers = await prisma.user.findMany();
 
   if (patients.length === 0) {
     console.log('⚠️ Skipping patient accounts - no patients found');
@@ -1205,10 +1203,18 @@ async function seedStaffMembers() {
     where: { email: 'lab.tech@hospital.com' },
   });
 
+  // Get department IDs
+  const departments = await prisma.department.findMany();
+  const departmentMap = new Map();
+  departments.forEach((dept) => {
+    departmentMap.set(dept.name, dept.id);
+  });
+
   const staffMembers = [
     {
       userId: admin!.id,
       employeeId: 'EMP001',
+      departmentId: departmentMap.get('Administration'),
       department: 'Administration',
       specialization: 'Hospital Management',
       licenseNumber: null,
@@ -1217,6 +1223,7 @@ async function seedStaffMembers() {
     {
       userId: doctorSmith!.id,
       employeeId: 'EMP002',
+      departmentId: departmentMap.get('Cardiology'),
       department: 'Cardiology',
       specialization: 'Cardiologist',
       licenseNumber: 'MD12345',
@@ -1225,6 +1232,7 @@ async function seedStaffMembers() {
     {
       userId: doctorJohnson!.id,
       employeeId: 'EMP003',
+      departmentId: departmentMap.get('Orthopedics'),
       department: 'Orthopedics',
       specialization: 'Orthopedic Surgeon',
       licenseNumber: 'MD67890',
@@ -1233,6 +1241,7 @@ async function seedStaffMembers() {
     {
       userId: nurseWilson!.id,
       employeeId: 'EMP004',
+      departmentId: departmentMap.get('Emergency'),
       department: 'Emergency',
       specialization: 'Emergency Care',
       licenseNumber: 'RN11111',
@@ -1241,6 +1250,7 @@ async function seedStaffMembers() {
     {
       userId: cashierBrown!.id,
       employeeId: 'EMP005',
+      departmentId: departmentMap.get('Finance'),
       department: 'Finance',
       specialization: 'Cash Management',
       licenseNumber: null,
@@ -1249,6 +1259,7 @@ async function seedStaffMembers() {
     {
       userId: pharmacistDavis!.id,
       employeeId: 'EMP006',
+      departmentId: departmentMap.get('Pharmacy'),
       department: 'Pharmacy',
       specialization: 'Clinical Pharmacy',
       licenseNumber: 'PH22222',
@@ -1257,6 +1268,7 @@ async function seedStaffMembers() {
     {
       userId: labTech!.id,
       employeeId: 'EMP007',
+      departmentId: departmentMap.get('Laboratory'),
       department: 'Laboratory',
       specialization: 'Medical Technology',
       licenseNumber: 'MT33333',
@@ -1412,6 +1424,88 @@ async function seedRoles() {
   }
 
   console.log(`✅ Created ${roles.length} roles`);
+}
+
+async function seedDepartments() {
+  console.log('🏥 Seeding departments...');
+
+  // Check if departments already exist
+  const existingDepartments = await prisma.department.count();
+  if (existingDepartments > 0) {
+    console.log(
+      `⚠️  Departments already exist (${existingDepartments}), skipping department creation`,
+    );
+    return;
+  }
+
+  const departments = [
+    {
+      name: 'Administration',
+      code: 'ADMIN',
+      description: 'Hospital administration and management',
+      isActive: true,
+    },
+    {
+      name: 'Cardiology',
+      code: 'CARD',
+      description: 'Heart and cardiovascular care department',
+      isActive: true,
+    },
+    {
+      name: 'Orthopedics',
+      code: 'ORTHO',
+      description: 'Bone, joint, and musculoskeletal care',
+      isActive: true,
+    },
+    {
+      name: 'Emergency',
+      code: 'ER',
+      description: 'Emergency medical services and trauma care',
+      isActive: true,
+    },
+    {
+      name: 'Finance',
+      code: 'FIN',
+      description: 'Financial management and billing services',
+      isActive: true,
+    },
+    {
+      name: 'Pharmacy',
+      code: 'PHARM',
+      description: 'Medication dispensing and pharmaceutical services',
+      isActive: true,
+    },
+    {
+      name: 'Laboratory',
+      code: 'LAB',
+      description: 'Medical testing and diagnostic services',
+      isActive: true,
+    },
+    {
+      name: 'Radiology',
+      code: 'RAD',
+      description: 'Medical imaging and diagnostic radiology',
+      isActive: true,
+    },
+    {
+      name: 'Pediatrics',
+      code: 'PED',
+      description: 'Medical care for infants, children, and adolescents',
+      isActive: true,
+    },
+    {
+      name: 'Surgery',
+      code: 'SURG',
+      description: 'Surgical procedures and operating room services',
+      isActive: true,
+    },
+  ];
+
+  for (const departmentData of departments) {
+    await prisma.department.create({ data: departmentData });
+  }
+
+  console.log(`✅ Created ${departments.length} departments`);
 }
 
 async function seedStaffRoleAssignments() {
@@ -1729,12 +1823,20 @@ async function seedServices() {
     where: { name: 'Registration' },
   });
 
+  // Get department IDs
+  const departments = await prisma.department.findMany();
+  const departmentMap = new Map();
+  departments.forEach((dept) => {
+    departmentMap.set(dept.name, dept.id);
+  });
+
   const services = [
     // Consultations
     {
       name: 'General Consultation',
       description: 'Basic doctor consultation',
       categoryId: consultationCategory!.id,
+      departmentId: departmentMap.get('Cardiology'),
       basePrice: 50.0,
       currentPrice: 50.0,
       serviceCode: 'CON001',
@@ -1753,6 +1855,7 @@ async function seedServices() {
       name: 'Emergency Consultation',
       description: 'Emergency room consultation',
       categoryId: emergencyCategory!.id,
+      departmentId: departmentMap.get('Emergency'),
       basePrice: 150.0,
       currentPrice: 150.0,
       serviceCode: 'EMG001',
@@ -1764,6 +1867,7 @@ async function seedServices() {
       name: 'Complete Blood Count',
       description: 'CBC blood test',
       categoryId: labCategory!.id,
+      departmentId: departmentMap.get('Laboratory'),
       basePrice: 25.0,
       currentPrice: 25.0,
       serviceCode: 'LAB001',
@@ -1793,6 +1897,7 @@ async function seedServices() {
       name: 'Chest X-Ray',
       description: 'Chest X-ray examination',
       categoryId: radiologyCategory!.id,
+      departmentId: departmentMap.get('Radiology'),
       basePrice: 80.0,
       currentPrice: 80.0,
       serviceCode: 'RAD001',
@@ -1813,6 +1918,7 @@ async function seedServices() {
       name: 'Appendectomy',
       description: 'Surgical removal of appendix',
       categoryId: surgeryCategory!.id,
+      departmentId: departmentMap.get('Surgery'),
       basePrice: 5000.0,
       currentPrice: 5000.0,
       serviceCode: 'SUR001',
@@ -1833,6 +1939,7 @@ async function seedServices() {
       name: 'Prescription Medication',
       description: 'General prescription medication',
       categoryId: pharmacyCategory!.id,
+      departmentId: departmentMap.get('Pharmacy'),
       basePrice: 30.0,
       currentPrice: 30.0,
       serviceCode: 'PHM001',
