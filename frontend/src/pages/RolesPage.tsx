@@ -1,17 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Typography } from '@mui/material';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/input';
-import { Chip } from '@/components/ui/badge';
 import {
+  Box,
+  Card,
+  CardContent,
+  CardHeader,
+  Typography,
+  Button,
+  TextField,
+  InputAdornment,
+  Chip,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, Tab, Box } from '@/components/ui/tabs';
+  Tabs,
+  Tab,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel,
+  Grid,
+  Paper,
+  Avatar,
+  Divider,
+  Alert,
+  Skeleton,
+  Stack,
+} from '@mui/material';
 import {
   Add,
   Search,
@@ -19,6 +44,12 @@ import {
   Delete,
   People,
   Security,
+  Visibility,
+  MoreVert,
+  CheckCircle,
+  Cancel,
+  AdminPanelSettings,
+  Group,
 } from '@mui/icons-material';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -39,7 +70,12 @@ export const RolesPage: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(0);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>(
+    'create'
+  );
 
   useEffect(() => {
     if (canViewRoles()) {
@@ -48,9 +84,9 @@ export const RolesPage: React.FC = () => {
   }, []);
 
   const loadRoles = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      // In a real app, you'd fetch this from your API
+      // Mock data for now
       const mockRoles: Role[] = [
         {
           id: '1',
@@ -59,9 +95,9 @@ export const RolesPage: React.FC = () => {
           description: 'Full system access with all permissions',
           permissions: ['admin'],
           isActive: true,
-          staffCount: 2,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
+          staffCount: 3,
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
         },
         {
           id: '2',
@@ -76,8 +112,8 @@ export const RolesPage: React.FC = () => {
           ],
           isActive: true,
           staffCount: 15,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
         },
         {
           id: '3',
@@ -87,8 +123,8 @@ export const RolesPage: React.FC = () => {
           permissions: ['manage_patients', 'view_billing', 'manage_lab_tests'],
           isActive: true,
           staffCount: 25,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
         },
         {
           id: '4',
@@ -102,8 +138,8 @@ export const RolesPage: React.FC = () => {
           ],
           isActive: true,
           staffCount: 8,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
         },
         {
           id: '5',
@@ -113,8 +149,8 @@ export const RolesPage: React.FC = () => {
           permissions: ['manage_lab_tests', 'view_patients'],
           isActive: true,
           staffCount: 12,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
         },
       ];
       setRoles(mockRoles);
@@ -144,314 +180,406 @@ export const RolesPage: React.FC = () => {
     return 'General';
   };
 
+  const handleCreateRole = () => {
+    setSelectedRole(null);
+    setDialogMode('create');
+    setDialogOpen(true);
+  };
+
+  const handleEditRole = (role: Role) => {
+    setSelectedRole(role);
+    setDialogMode('edit');
+    setDialogOpen(true);
+  };
+
+  const handleViewRole = (role: Role) => {
+    setSelectedRole(role);
+    setDialogMode('view');
+    setDialogOpen(true);
+  };
+
+  const handleDeleteRole = (role: Role) => {
+    // Implement delete functionality
+    console.log('Delete role:', role);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setSelectedRole(null);
+  };
+
   if (!canViewRoles()) {
     return (
-      <Card>
-        <CardContent className='p-6'>
-          <div className='text-center text-red-600'>
-            You don't have permission to view roles.
-          </div>
-        </CardContent>
-      </Card>
+      <Box sx={{ p: 3 }}>
+        <Alert severity='error' sx={{ textAlign: 'center' }}>
+          You don't have permission to view roles.
+        </Alert>
+      </Box>
     );
   }
 
   if (isLoading) {
     return (
-      <div className='space-y-6'>
-        <div className='text-center py-8'>
-          <div className='text-lg'>Loading roles...</div>
-        </div>
-      </div>
+      <Box sx={{ p: 3 }}>
+        <Typography variant='h6' sx={{ textAlign: 'center', mb: 3 }}>
+          Loading roles...
+        </Typography>
+        <Grid container spacing={3}>
+          {[...Array(6)].map((_, index) => (
+            <Grid item xs={12} sm={6} md={4} key={index}>
+              <Card>
+                <CardContent>
+                  <Skeleton variant='text' height={40} />
+                  <Skeleton variant='text' height={20} />
+                  <Skeleton variant='text' height={20} />
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
     );
   }
 
   return (
-    <div className='space-y-6'>
+    <Box sx={{ p: 3 }}>
       {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h1 className='text-2xl font-bold'>Role Management</h1>
-          <p className='text-muted-foreground'>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+        }}
+      >
+        <Box>
+          <Typography
+            variant='h4'
+            component='h1'
+            sx={{ fontWeight: 'bold', mb: 1 }}
+          >
+            Role Management
+          </Typography>
+          <Typography variant='body1' color='text.secondary'>
             Manage system roles and their associated permissions
-          </p>
-        </div>
+          </Typography>
+        </Box>
         {canManageRoles() && (
-          <Button>
-            <Add sx={{ fontSize: 16, mr: 1 }} />
+          <Button
+            variant='contained'
+            startIcon={<Add />}
+            onClick={handleCreateRole}
+            sx={{ height: 40 }}
+          >
             Add Role
           </Button>
         )}
-      </div>
+      </Box>
 
       {/* Overview Cards */}
-      <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center space-x-2'>
-              <Security sx={{ fontSize: 32, color: 'primary.main' }} />
-              <div>
-                <p className='text-sm font-medium text-muted-foreground'>
-                  Total Roles
-                </p>
-                <p className='text-2xl font-bold'>{roles.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center space-x-2'>
-              <People sx={{ fontSize: 32, color: 'success.main' }} />
-              <div>
-                <p className='text-sm font-medium text-muted-foreground'>
-                  Active Users
-                </p>
-                <p className='text-2xl font-bold'>
-                  {roles.reduce((sum, role) => sum + role.staffCount, 0)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center space-x-2'>
-              <Security sx={{ fontSize: 32, color: 'purple.600' }} />
-              <div>
-                <p className='text-sm font-medium text-muted-foreground'>
-                  Active Roles
-                </p>
-                <p className='text-2xl font-bold'>
-                  {roles.filter((role) => role.isActive).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center space-x-2'>
-              <Security sx={{ fontSize: 32, color: 'orange.600' }} />
-              <div>
-                <p className='text-sm font-medium text-muted-foreground'>
-                  Total Permissions
-                </p>
-                <p className='text-2xl font-bold'>
-                  {
-                    Array.from(
-                      new Set(roles.flatMap((role) => role.permissions))
-                    ).length
-                  }
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Management Tabs */}
-      <Tabs
-        value={activeTab}
-        onChange={(event, newValue) => setActiveTab(newValue)}
-        className='space-y-4'
-      >
-        <Box className='grid w-full grid-cols-2'>
-          <Tab value='overview' label='Overview' />
-          <Tab value='roles' label='All Roles' />
-        </Box>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <Box className='space-y-4'>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Role Summary */}
-              <Card>
-                <CardHeader>
-                  <Typography variant='h6' component='h3'>
-                    Role Summary
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
+                  <Security />
+                </Avatar>
+                <Box>
+                  <Typography variant='body2' color='text.secondary'>
+                    Total Roles
                   </Typography>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-3'>
-                    {roles.map((role) => (
-                      <div
-                        key={role.id}
-                        className='flex items-center justify-between p-3 bg-gray-50 rounded-lg'
+                  <Typography variant='h4' sx={{ fontWeight: 'bold' }}>
+                    {roles.length}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
+                  <People />
+                </Avatar>
+                <Box>
+                  <Typography variant='body2' color='text.secondary'>
+                    Active Users
+                  </Typography>
+                  <Typography variant='h4' sx={{ fontWeight: 'bold' }}>
+                    {roles.reduce((sum, role) => sum + role.staffCount, 0)}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
+                  <CheckCircle />
+                </Avatar>
+                <Box>
+                  <Typography variant='body2' color='text.secondary'>
+                    Active Roles
+                  </Typography>
+                  <Typography variant='h4' sx={{ fontWeight: 'bold' }}>
+                    {roles.filter((role) => role.isActive).length}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: 'warning.main', width: 48, height: 48 }}>
+                  <AdminPanelSettings />
+                </Avatar>
+                <Box>
+                  <Typography variant='body2' color='text.secondary'>
+                    Total Permissions
+                  </Typography>
+                  <Typography variant='h4' sx={{ fontWeight: 'bold' }}>
+                    {
+                      Array.from(
+                        new Set(roles.flatMap((role) => role.permissions))
+                      ).length
+                    }
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Search and Filter */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              placeholder='Search roles...'
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <Search />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 1 }}
+            />
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Roles Table */}
+      <Card>
+        <CardHeader
+          title='All Roles'
+          subheader={`${filteredRoles.length} roles found`}
+        />
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Role</TableCell>
+                <TableCell>Code</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Permissions</TableCell>
+                <TableCell>Staff Count</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align='right'>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredRoles.map((role) => (
+                <TableRow key={role.id} hover>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}
                       >
-                        <div>
-                          <p className='font-medium'>{role.name}</p>
-                          <p className='text-sm text-muted-foreground'>
-                            {role.description}
-                          </p>
-                        </div>
-                        <div className='text-right'>
-                          <Chip
-                            label={`${role.staffCount} users`}
-                            variant={role.isActive ? 'filled' : 'outlined'}
-                          />
-                          <p className='text-xs text-muted-foreground mt-1'>
-                            {role.permissions.length} permissions
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Permission Categories */}
-              <Card>
-                <CardHeader>
-                  <Typography variant='h6' component='h3'>
-                    Permission Categories
-                  </Typography>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-3'>
-                    {Array.from(
-                      new Set(roles.flatMap((role) => role.permissions))
-                    ).map((permission) => {
-                      const category = getPermissionCategory(permission);
-                      return (
-                        <div
-                          key={permission}
-                          className='flex items-center justify-between'
+                        {role.name.charAt(0)}
+                      </Avatar>
+                      <Box>
+                        <Typography
+                          variant='subtitle2'
+                          sx={{ fontWeight: 600 }}
                         >
-                          <span className='text-sm'>
-                            {permission.replace(/_/g, ' ')}
-                          </span>
-                          <Chip
-                            label={category}
-                            variant='outlined'
-                            size='small'
-                            className='text-xs'
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </Box>
-        )}
-
-        {/* All Roles Tab */}
-        {activeTab === 'roles' && (
-          <Box className='space-y-4'>
-            <Card>
-              <CardHeader>
-                <Typography variant='h6' component='h3'>
-                  System Roles
-                </Typography>
-              </CardHeader>
-              <CardContent>
-                {/* Search */}
-                <div className='mb-4'>
-                  <div className='relative'>
-                    <Search
-                      sx={{
-                        position: 'absolute',
-                        left: 12,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: 16,
-                        color: 'text.secondary',
-                      }}
-                    />
-                    <TextField
-                      placeholder='Search roles...'
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className='pl-10'
-                    />
-                  </div>
-                </div>
-
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Role Name</TableCell>
-                      <TableCell>Code</TableCell>
-                      <TableCell>Description</TableCell>
-                      <TableCell>Permissions</TableCell>
-                      <TableCell>Users</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredRoles.map((role) => (
-                      <TableRow key={role.id}>
-                        <TableCell className='font-medium'>
                           {role.name}
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={role.code} variant='outlined' />
-                        </TableCell>
-                        <TableCell className='text-muted-foreground max-w-xs'>
-                          <p className='truncate'>{role.description}</p>
-                        </TableCell>
-                        <TableCell>
-                          <div className='flex flex-wrap gap-1'>
-                            {role.permissions.slice(0, 3).map((permission) => (
-                              <Chip
-                                key={permission}
-                                label={permission.replace(/_/g, ' ')}
-                                variant='outlined'
-                                size='small'
-                                className='text-xs'
-                              />
-                            ))}
-                            {role.permissions.length > 3 && (
-                              <Chip
-                                label={`+${role.permissions.length - 3} more`}
-                                variant='outlined'
-                                size='small'
-                                className='text-xs'
-                              />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={role.staffCount} variant='outlined' />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={role.isActive ? 'Active' : 'Inactive'}
-                            variant={role.isActive ? 'filled' : 'outlined'}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className='flex space-x-2'>
-                            {canManageRoles() && (
-                              <>
-                                <Button size='small' variant='outlined'>
-                                  <Edit sx={{ fontSize: 16 }} />
-                                </Button>
-                                <Button size='small' variant='outlined'>
-                                  <Delete sx={{ fontSize: 16 }} />
-                                </Button>
-                              </>
-                            )}
-                            <Button size='small' variant='outlined'>
-                              View
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </Box>
-        )}
-      </Tabs>
-    </div>
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={role.code}
+                      size='small'
+                      color='primary'
+                      variant='outlined'
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant='body2' color='text.secondary'>
+                      {role.description}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {role.permissions.slice(0, 3).map((permission) => (
+                        <Chip
+                          key={permission}
+                          label={permission}
+                          size='small'
+                          color='default'
+                          variant='outlined'
+                        />
+                      ))}
+                      {role.permissions.length > 3 && (
+                        <Chip
+                          label={`+${role.permissions.length - 3} more`}
+                          size='small'
+                          color='default'
+                          variant='outlined'
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Group fontSize='small' color='action' />
+                      <Typography variant='body2'>{role.staffCount}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={role.isActive ? 'Active' : 'Inactive'}
+                      color={role.isActive ? 'success' : 'default'}
+                      size='small'
+                    />
+                  </TableCell>
+                  <TableCell align='right'>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 1,
+                        justifyContent: 'flex-end',
+                      }}
+                    >
+                      <Tooltip title='View Details'>
+                        <IconButton
+                          size='small'
+                          onClick={() => handleViewRole(role)}
+                        >
+                          <Visibility fontSize='small' />
+                        </IconButton>
+                      </Tooltip>
+                      {canManageRoles() && (
+                        <>
+                          <Tooltip title='Edit Role'>
+                            <IconButton
+                              size='small'
+                              onClick={() => handleEditRole(role)}
+                            >
+                              <Edit fontSize='small' />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title='Delete Role'>
+                            <IconButton
+                              size='small'
+                              onClick={() => handleDeleteRole(role)}
+                              color='error'
+                            >
+                              <Delete fontSize='small' />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+
+      {/* Role Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth='md'
+        fullWidth
+      >
+        <DialogTitle>
+          {dialogMode === 'create' && 'Create New Role'}
+          {dialogMode === 'edit' && 'Edit Role'}
+          {dialogMode === 'view' && 'Role Details'}
+        </DialogTitle>
+        <DialogContent>
+          {selectedRole && (
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              <Box>
+                <Typography variant='h6' gutterBottom>
+                  {selectedRole.name}
+                </Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  {selectedRole.description}
+                </Typography>
+              </Box>
+
+              <Divider />
+
+              <Box>
+                <Typography variant='subtitle1' gutterBottom>
+                  Permissions
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {selectedRole.permissions.map((permission) => (
+                    <Chip
+                      key={permission}
+                      label={permission}
+                      color='primary'
+                      variant='outlined'
+                    />
+                  ))}
+                </Box>
+              </Box>
+
+              <Box>
+                <Typography variant='subtitle1' gutterBottom>
+                  Staff Count
+                </Typography>
+                <Typography variant='body2'>
+                  {selectedRole.staffCount} users assigned to this role
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>
+            {dialogMode === 'view' ? 'Close' : 'Cancel'}
+          </Button>
+          {dialogMode !== 'view' && (
+            <Button variant='contained'>
+              {dialogMode === 'create' ? 'Create' : 'Save'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };

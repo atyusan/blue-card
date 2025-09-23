@@ -19,6 +19,8 @@ import { RolesPage } from './pages/RolesPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import BillingPage from './pages/BillingPage';
 import { CashManagementPage } from './pages/CashManagementPage';
+import CashRequestsPage from './pages/CashRequestsPage';
+import CashOfficeTransactionsPage from './pages/CashOfficeTransactionsPage';
 import { UserPermissionsPage } from './pages/UserPermissionsPage';
 import CreateInvoicePage from './pages/CreateInvoicePage';
 import InvoiceDetailsPage from './pages/InvoiceDetailsPage';
@@ -172,6 +174,24 @@ const AppRoutes: React.FC = () => {
           element={
             <PermissionGuard permissions={['view_cash_transactions']}>
               <CashManagementPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='cash/transactions'
+          element={
+            <PermissionGuard permissions={['view_cash_transactions']}>
+              <CashOfficeTransactionsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='cash/requests'
+          element={
+            <PermissionGuard permissions={['view_cash_transactions']}>
+              <CashRequestsPage />
             </PermissionGuard>
           }
         />

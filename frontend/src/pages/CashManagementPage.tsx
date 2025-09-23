@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -11,7 +12,6 @@ import {
   Tabs,
   Tab,
   Skeleton,
-  Divider,
   IconButton,
   Tooltip,
   Table,
@@ -30,15 +30,10 @@ import {
   TrendingUp,
   TrendingDown,
   AccountBalance,
-  Receipt,
   RequestPage,
   CheckCircle,
   Cancel,
   Pending,
-  AttachMoney,
-  Category,
-  Business,
-  CalendarToday,
 } from '@mui/icons-material';
 import { usePermissions } from '../hooks/usePermissions';
 import PageHeader from '../components/common/PageHeader';
@@ -87,6 +82,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export const CashManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [requests, setRequests] = useState<CashRequest[]>([]);
@@ -171,27 +167,27 @@ export const CashManagementPage: React.FC = () => {
   };
 
   const handleAddTransaction = () => {
-    console.log('Add transaction');
+    navigate('/cash/transactions');
   };
 
   const handleAddRequest = () => {
-    console.log('Add request');
+    navigate('/cash/requests');
   };
 
   const handleEditTransaction = (id: string) => {
-    console.log('Edit transaction', id);
+    navigate(`/cash/transactions?edit=${id}`);
   };
 
   const handleViewTransaction = (id: string) => {
-    console.log('View transaction', id);
+    navigate(`/cash/transactions?view=${id}`);
   };
 
   const handleEditRequest = (id: string) => {
-    console.log('Edit request', id);
+    navigate(`/cash/requests?edit=${id}`);
   };
 
   const handleViewRequest = (id: string) => {
-    console.log('View request', id);
+    navigate(`/cash/requests?view=${id}`);
   };
 
   const getStatusColor = (status: string) => {
