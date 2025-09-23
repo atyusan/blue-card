@@ -30,6 +30,14 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Grid,
+  Stack,
+  IconButton,
+  Badge,
+  LinearProgress,
+  Tooltip,
+  Fade,
+  Zoom,
 } from '@mui/material';
 import {
   Person,
@@ -43,6 +51,23 @@ import {
   Delete,
   Add,
   Schedule,
+  CalendarToday,
+  AttachMoney,
+  LocalHospital,
+  History,
+  MoreVert,
+  Print,
+  Share,
+  Download,
+  TrendingUp,
+  AccessTime,
+  CheckCircle,
+  Warning,
+  Error,
+  Star,
+  Favorite,
+  Notifications,
+  Security,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../components/common/PageHeader';
@@ -110,11 +135,14 @@ const PatientDetailsPage: React.FC = () => {
   });
 
   // Fetch patient invoices
-  const { data: invoices, isLoading: isLoadingInvoices } = useQuery({
+  const { data: invoicesResponse, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ['patient-invoices', id],
     queryFn: () => invoiceService.getInvoices({ patientId: id }),
     enabled: !!id,
   });
+
+  // Extract invoices from response - now properly paginated
+  const invoices = invoicesResponse?.data || [];
 
   // Fetch medical history
   const { data: medicalHistory, isLoading: isLoadingMedicalHistory } = useQuery(
@@ -300,36 +328,76 @@ const PatientDetailsPage: React.FC = () => {
         subtitle='Patient information and medical history'
         breadcrumbs={<Breadcrumb />}
         actions={
-          <Box display='flex' gap={1}>
-            <Button
-              variant='outlined'
-              startIcon={<Schedule />}
-              onClick={handleNewAppointment}
-            >
-              New Appointment
-            </Button>
-            <Button
-              variant='outlined'
-              startIcon={<Receipt />}
-              onClick={handleNewInvoice}
-            >
-              New Invoice
-            </Button>
-            <Button
-              variant='outlined'
-              startIcon={<Edit />}
-              onClick={handleEdit}
-            >
-              Edit
-            </Button>
-            <Button
-              variant='outlined'
-              color='error'
-              startIcon={<Delete />}
-              onClick={handleDelete}
-            >
-              Delete
-            </Button>
+          <Box display='flex' gap={1} flexWrap='wrap'>
+            <Tooltip title='Schedule new appointment'>
+              <Button
+                variant='contained'
+                startIcon={<Schedule />}
+                onClick={handleNewAppointment}
+                sx={{
+                  background:
+                    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background:
+                      'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                  },
+                }}
+              >
+                New Appointment
+              </Button>
+            </Tooltip>
+            <Tooltip title='Create new invoice'>
+              <Button
+                variant='contained'
+                startIcon={<Receipt />}
+                onClick={handleNewInvoice}
+                sx={{
+                  background:
+                    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  '&:hover': {
+                    background:
+                      'linear-gradient(135deg, #ee82f9 0%, #f3455a 100%)',
+                  },
+                }}
+              >
+                New Invoice
+              </Button>
+            </Tooltip>
+            <Tooltip title='Edit patient information'>
+              <Button
+                variant='outlined'
+                startIcon={<Edit />}
+                onClick={handleEdit}
+                sx={{
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
+                  '&:hover': {
+                    borderColor: 'primary.dark',
+                    bgcolor: 'primary.50',
+                  },
+                }}
+              >
+                Edit
+              </Button>
+            </Tooltip>
+            <Tooltip title='Delete patient'>
+              <Button
+                variant='outlined'
+                color='error'
+                startIcon={<Delete />}
+                onClick={handleDelete}
+                sx={{
+                  borderColor: 'error.main',
+                  color: 'error.main',
+                  '&:hover': {
+                    borderColor: 'error.dark',
+                    bgcolor: 'error.50',
+                  },
+                }}
+              >
+                Delete
+              </Button>
+            </Tooltip>
           </Box>
         }
         showActions={false}
@@ -338,101 +406,263 @@ const PatientDetailsPage: React.FC = () => {
       <Box className='grid grid-cols-1 md:grid-cols-4 gap-6'>
         {/* Patient Summary Card */}
         <Box className='md:col-span-1'>
-          <Card>
-            <CardContent>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Decorative background pattern */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -50,
+                right: -50,
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: -30,
+                left: -30,
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
               <Box
                 display='flex'
-                flexDirection='column'
-                alignItems='center'
+                justifyContent='space-between'
+                alignItems='flex-start'
                 mb={3}
               >
-                <Avatar
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    fontSize: '2rem',
-                    bgcolor:
-                      patient.gender === 'MALE'
-                        ? 'primary.main'
-                        : 'secondary.main',
-                    mb: 2,
-                  }}
-                >
-                  {getInitials(`${patient.firstName} ${patient.lastName}`)}
-                </Avatar>
-                <Typography variant='h5' fontWeight={600} textAlign='center'>
-                  {patient.firstName} {patient.lastName}
-                </Typography>
-                <Chip
-                  label={patient.status || 'Active'}
-                  color={getStatusColor(patient.status || 'active') as any}
-                  size='small'
-                  sx={{ mt: 1 }}
-                />
+                <Box>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      fontSize: '2rem',
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      border: '3px solid rgba(255,255,255,0.3)',
+                      mb: 2,
+                    }}
+                  >
+                    {getInitials(`${patient.firstName} ${patient.lastName}`)}
+                  </Avatar>
+                  <Typography variant='h5' fontWeight={700} color='white'>
+                    {patient.firstName} {patient.lastName}
+                  </Typography>
+                  <Typography
+                    variant='body2'
+                    color='rgba(255,255,255,0.8)'
+                    sx={{ mb: 1 }}
+                  >
+                    Patient ID: {patient.id.slice(-8)}
+                  </Typography>
+                  <Chip
+                    label={patient.status || 'Active'}
+                    color={patient.status === 'Active' ? 'success' : 'default'}
+                    size='small'
+                    sx={{
+                      bgcolor:
+                        patient.status === 'Active'
+                          ? 'rgba(76,175,80,0.9)'
+                          : 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+                <Box>
+                  <IconButton sx={{ color: 'white' }}>
+                    <MoreVert />
+                  </IconButton>
+                </Box>
               </Box>
 
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.3)', mb: 3 }} />
 
-              <List disablePadding>
-                <ListItem disablePadding sx={{ py: 1 }}>
-                  <ListItemIcon>
-                    <Person color='primary' />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary='Age'
-                    secondary={`${calculateAge(patient.dateOfBirth)} years old`}
-                  />
-                </ListItem>
-                <ListItem disablePadding sx={{ py: 1 }}>
-                  <ListItemIcon>
-                    <Person color='primary' />
-                  </ListItemIcon>
-                  <ListItemText primary='Gender' secondary={patient.gender} />
-                </ListItem>
-                <ListItem disablePadding sx={{ py: 1 }}>
-                  <ListItemIcon>
-                    <Phone color='primary' />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary='Phone'
-                    secondary={patient.phoneNumber}
-                  />
-                </ListItem>
+              <Stack spacing={2}>
+                <Box display='flex' alignItems='center' gap={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Person sx={{ color: 'white', fontSize: 20 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                      Age
+                    </Typography>
+                    <Typography variant='body1' fontWeight={600} color='white'>
+                      {calculateAge(patient.dateOfBirth)} years old
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box display='flex' alignItems='center' gap={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Person sx={{ color: 'white', fontSize: 20 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                      Gender
+                    </Typography>
+                    <Typography variant='body1' fontWeight={600} color='white'>
+                      {patient.gender}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box display='flex' alignItems='center' gap={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Phone sx={{ color: 'white', fontSize: 20 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                      Phone
+                    </Typography>
+                    <Typography variant='body1' fontWeight={600} color='white'>
+                      {patient.phoneNumber}
+                    </Typography>
+                  </Box>
+                </Box>
+
                 {patient.email && (
-                  <ListItem disablePadding sx={{ py: 1 }}>
-                    <ListItemIcon>
-                      <Email color='primary' />
-                    </ListItemIcon>
-                    <ListItemText primary='Email' secondary={patient.email} />
-                  </ListItem>
+                  <Box display='flex' alignItems='center' gap={2}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: 2,
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Email sx={{ color: 'white', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                        Email
+                      </Typography>
+                      <Typography
+                        variant='body1'
+                        fontWeight={600}
+                        color='white'
+                      >
+                        {patient.email}
+                      </Typography>
+                    </Box>
+                  </Box>
                 )}
-                <ListItem disablePadding sx={{ py: 1 }}>
-                  <ListItemIcon>
-                    <LocationOn color='primary' />
-                  </ListItemIcon>
-                  <ListItemText primary='Address' secondary={patient.address} />
-                </ListItem>
-              </List>
+
+                <Box display='flex' alignItems='center' gap={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <LocationOn sx={{ color: 'white', fontSize: 20 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                      Address
+                    </Typography>
+                    <Typography variant='body1' fontWeight={600} color='white'>
+                      {patient.address}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Stack>
             </CardContent>
           </Card>
 
           {/* Emergency Contact Card */}
           {patient.emergencyContact && (
-            <Card sx={{ mt: 3 }}>
-              <CardHeader
-                title='Emergency Contact'
-                avatar={<ContactEmergency color='error' />}
-              />
-              <CardContent sx={{ pt: 0 }}>
-                <Typography variant='body2' fontWeight={500}>
-                  {patient.emergencyContact.name}
-                </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {patient.emergencyContact.relationship}
-                </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {patient.emergencyContact.phoneNumber}
-                </Typography>
+            <Card
+              sx={{
+                mt: 3,
+                background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)',
+                color: 'white',
+              }}
+            >
+              <CardContent>
+                <Box display='flex' alignItems='center' gap={2} mb={2}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ContactEmergency sx={{ color: 'white', fontSize: 24 }} />
+                  </Box>
+                  <Typography variant='h6' fontWeight={600} color='white'>
+                    Emergency Contact
+                  </Typography>
+                </Box>
+                <Box sx={{ pl: 6 }}>
+                  <Typography
+                    variant='body1'
+                    fontWeight={600}
+                    color='white'
+                    sx={{ mb: 0.5 }}
+                  >
+                    {patient.emergencyContact.name}
+                  </Typography>
+                  <Typography
+                    variant='body2'
+                    color='rgba(255,255,255,0.8)'
+                    sx={{ mb: 1 }}
+                  >
+                    {patient.emergencyContact.relationship}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    📞 {patient.emergencyContact.phoneNumber}
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           )}
@@ -452,53 +682,317 @@ const PatientDetailsPage: React.FC = () => {
 
             {/* Overview Tab */}
             <TabPanel value={tabValue} index={0}>
-              <Box className='grid grid-cols-1 sm:grid-cols-2 gap-6'>
-                <Box>
-                  <Paper sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant='h4' color='primary'>
-                      {appointments?.length || 0}
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Total Appointments
-                    </Typography>
-                  </Paper>
-                </Box>
-                <Box>
-                  <Paper sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant='h4' color='primary'>
-                      {invoices?.data?.length || 0}
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Total Invoices
-                    </Typography>
-                  </Paper>
-                </Box>
-                <Box className='col-span-full'>
-                  <Typography variant='h6' gutterBottom>
-                    Patient Information
-                  </Typography>
-                  <Box className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Date of Birth
-                      </Typography>
-                      <Typography variant='body1'>
-                        {formatDate(patient.dateOfBirth)}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Last Visit
-                      </Typography>
-                      <Typography variant='body1'>
-                        {patient.lastVisit
-                          ? formatDate(patient.lastVisit)
-                          : 'Never'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </Box>
+              <Grid container spacing={3}>
+                {/* Statistics Cards */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    sx={{
+                      background:
+                        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -20,
+                        right: -20,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    />
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box
+                        display='flex'
+                        alignItems='center'
+                        justifyContent='space-between'
+                      >
+                        <Box>
+                          <Typography
+                            variant='h4'
+                            fontWeight={700}
+                            color='white'
+                          >
+                            {appointments?.length || 0}
+                          </Typography>
+                          <Typography
+                            variant='body2'
+                            color='rgba(255,255,255,0.8)'
+                          >
+                            Total Appointments
+                          </Typography>
+                        </Box>
+                        <CalendarToday
+                          sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    sx={{
+                      background:
+                        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -20,
+                        right: -20,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    />
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box
+                        display='flex'
+                        alignItems='center'
+                        justifyContent='space-between'
+                      >
+                        <Box>
+                          <Typography
+                            variant='h4'
+                            fontWeight={700}
+                            color='white'
+                          >
+                            {Array.isArray(invoices) ? invoices.length : 0}
+                          </Typography>
+                          <Typography
+                            variant='body2'
+                            color='rgba(255,255,255,0.8)'
+                          >
+                            Total Invoices
+                          </Typography>
+                        </Box>
+                        <Receipt
+                          sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    sx={{
+                      background:
+                        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -20,
+                        right: -20,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    />
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box
+                        display='flex'
+                        alignItems='center'
+                        justifyContent='space-between'
+                      >
+                        <Box>
+                          <Typography
+                            variant='h4'
+                            fontWeight={700}
+                            color='white'
+                          >
+                            {Array.isArray(invoices)
+                              ? invoices.filter((inv) => inv.status === 'PAID')
+                                  .length
+                              : 0}
+                          </Typography>
+                          <Typography
+                            variant='body2'
+                            color='rgba(255,255,255,0.8)'
+                          >
+                            Paid Invoices
+                          </Typography>
+                        </Box>
+                        <CheckCircle
+                          sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    sx={{
+                      background:
+                        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -20,
+                        right: -20,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    />
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box
+                        display='flex'
+                        alignItems='center'
+                        justifyContent='space-between'
+                      >
+                        <Box>
+                          <Typography
+                            variant='h4'
+                            fontWeight={700}
+                            color='white'
+                          >
+                            {Array.isArray(invoices)
+                              ? invoices
+                                  .reduce(
+                                    (sum, inv) => sum + (inv.totalAmount || 0),
+                                    0
+                                  )
+                                  .toLocaleString()
+                              : 0}
+                          </Typography>
+                          <Typography
+                            variant='body2'
+                            color='rgba(255,255,255,0.8)'
+                          >
+                            Total Spent
+                          </Typography>
+                        </Box>
+                        <AttachMoney
+                          sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Patient Information Card */}
+                <Grid item xs={12}>
+                  <Card
+                    sx={{
+                      background:
+                        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -30,
+                        right: -30,
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    />
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box display='flex' alignItems='center' gap={2} mb={3}>
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <LocalHospital
+                            sx={{ color: 'white', fontSize: 24 }}
+                          />
+                        </Box>
+                        <Typography variant='h6' fontWeight={600} color='white'>
+                          Patient Information
+                        </Typography>
+                      </Box>
+
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: 'rgba(255,255,255,0.1)',
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Typography
+                              variant='body2'
+                              color='rgba(255,255,255,0.8)'
+                              sx={{ mb: 1 }}
+                            >
+                              Date of Birth
+                            </Typography>
+                            <Typography
+                              variant='h6'
+                              fontWeight={600}
+                              color='white'
+                            >
+                              {formatDate(patient.dateOfBirth)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: 'rgba(255,255,255,0.1)',
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Typography
+                              variant='body2'
+                              color='rgba(255,255,255,0.8)'
+                              sx={{ mb: 1 }}
+                            >
+                              Last Visit
+                            </Typography>
+                            <Typography
+                              variant='h6'
+                              fontWeight={600}
+                              color='white'
+                            >
+                              {patient.lastVisit
+                                ? formatDate(patient.lastVisit)
+                                : 'Never'}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
             </TabPanel>
 
             {/* Appointments Tab */}
@@ -507,13 +1001,48 @@ const PatientDetailsPage: React.FC = () => {
                 display='flex'
                 justifyContent='space-between'
                 alignItems='center'
-                mb={2}
+                mb={3}
+                sx={{
+                  p: 2,
+                  bgcolor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 2,
+                  color: 'blue',
+                }}
               >
-                <Typography variant='h6'>Appointments</Typography>
+                <Box display='flex' alignItems='center' gap={2}>
+                  <CalendarToday sx={{ fontSize: 28, color: 'blue' }} />
+                  <Typography
+                    variant='h6'
+                    fontWeight={600}
+                    sx={{ color: 'blue' }}
+                  >
+                    Appointments
+                  </Typography>
+                  <Badge
+                    badgeContent={appointments?.length || 0}
+                    color='error'
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        bgcolor: 'rgba(255,255,255,0.9)',
+                        color: '#667eea',
+                        fontWeight: 600,
+                      },
+                    }}
+                  />
+                </Box>
                 <Button
                   variant='contained'
                   startIcon={<Add />}
                   onClick={handleNewAppointment}
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'blue',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                      border: '1px solid rgba(255,255,255,0.5)',
+                    },
+                  }}
                 >
                   New Appointment
                 </Button>
@@ -582,20 +1111,55 @@ const PatientDetailsPage: React.FC = () => {
                 display='flex'
                 justifyContent='space-between'
                 alignItems='center'
-                mb={2}
+                mb={3}
+                sx={{
+                  p: 2,
+                  bgcolor: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  borderRadius: 2,
+                  color: 'white',
+                }}
               >
-                <Typography variant='h6'>Invoices</Typography>
+                <Box display='flex' alignItems='center' gap={2}>
+                  <Receipt sx={{ fontSize: 28, color: '#4facfe' }} />
+                  <Typography
+                    variant='h6'
+                    fontWeight={600}
+                    sx={{ color: '#4facfe' }}
+                  >
+                    Invoices
+                  </Typography>
+                  <Badge
+                    badgeContent={Array.isArray(invoices) ? invoices.length : 0}
+                    color='error'
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        bgcolor: 'rgba(255,255,255,0.9)',
+                        color: '#f093fb',
+                        fontWeight: 600,
+                      },
+                    }}
+                  />
+                </Box>
                 <Button
                   variant='contained'
                   startIcon={<Add />}
                   onClick={handleNewInvoice}
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: '#4facfe',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                      border: '1px solid rgba(255,255,255,0.5)',
+                    },
+                  }}
                 >
                   New Invoice
                 </Button>
               </Box>
               {isLoadingInvoices ? (
                 <Skeleton variant='rectangular' height={200} />
-              ) : invoices?.data && invoices.data.length > 0 ? (
+              ) : Array.isArray(invoices) && invoices.length > 0 ? (
                 <TableContainer>
                   <Table>
                     <TableHead>
@@ -608,10 +1172,16 @@ const PatientDetailsPage: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {invoices.data.map((invoice) => (
+                      {invoices.map((invoice) => (
                         <TableRow key={invoice.id}>
-                          <TableCell>{invoice.number}</TableCell>
-                          <TableCell>{formatDate(invoice.createdAt)}</TableCell>
+                          <TableCell>
+                            {invoice.invoiceNumber || invoice.number}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(
+                              invoice.issuedDate || invoice.createdAt
+                            )}
+                          </TableCell>
                           <TableCell>
                             {formatCurrency(invoice.totalAmount)}
                           </TableCell>
@@ -652,13 +1222,48 @@ const PatientDetailsPage: React.FC = () => {
                 display='flex'
                 justifyContent='space-between'
                 alignItems='center'
-                mb={2}
+                mb={3}
+                sx={{
+                  p: 2,
+                  bgcolor: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  borderRadius: 2,
+                  color: 'blue',
+                }}
               >
-                <Typography variant='h6'>Medical History</Typography>
+                <Box display='flex' alignItems='center' gap={2}>
+                  <History sx={{ fontSize: 28, color: 'blue' }} />
+                  <Typography
+                    variant='h6'
+                    fontWeight={600}
+                    sx={{ color: 'blue' }}
+                  >
+                    Medical History
+                  </Typography>
+                  <Badge
+                    badgeContent={medicalHistory?.length || 0}
+                    color='error'
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        bgcolor: 'rgba(255,255,255,0.9)',
+                        color: '#4facfe',
+                        fontWeight: 600,
+                      },
+                    }}
+                  />
+                </Box>
                 <Button
                   variant='contained'
                   startIcon={<Add />}
                   onClick={() => setMedicalHistoryDialogOpen(true)}
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'blue',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                      border: '1px solid rgba(255,255,255,0.5)',
+                    },
+                  }}
                 >
                   Add Entry
                 </Button>
@@ -666,48 +1271,188 @@ const PatientDetailsPage: React.FC = () => {
 
               {/* Current Medical Info */}
               {patient.medicalHistory && (
-                <Box className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6'>
+                <Grid container spacing={3} sx={{ mb: 4 }}>
                   {patient.medicalHistory.allergies && (
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Allergies
-                      </Typography>
-                      <Typography variant='body1'>
-                        {patient.medicalHistory.allergies}
-                      </Typography>
-                    </Box>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Card
+                        sx={{
+                          background:
+                            'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                          color: 'white',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: -20,
+                            right: -20,
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                          }}
+                        />
+                        <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                          <Box display='flex' alignItems='center' gap={2}>
+                            <Warning sx={{ fontSize: 24 }} />
+                            <Box>
+                              <Typography
+                                variant='body2'
+                                color='rgba(255,255,255,0.8)'
+                              >
+                                Allergies
+                              </Typography>
+                              <Typography
+                                variant='h6'
+                                fontWeight={600}
+                                color='white'
+                              >
+                                {patient.medicalHistory.allergies}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   )}
                   {patient.medicalHistory.bloodGroup && (
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Blood Group
-                      </Typography>
-                      <Typography variant='body1'>
-                        {patient.medicalHistory.bloodGroup}
-                      </Typography>
-                    </Box>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Card
+                        sx={{
+                          background:
+                            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                          color: 'white',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: -20,
+                            right: -20,
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                          }}
+                        />
+                        <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                          <Box display='flex' alignItems='center' gap={2}>
+                            <LocalHospital sx={{ fontSize: 24 }} />
+                            <Box>
+                              <Typography
+                                variant='body2'
+                                color='rgba(255,255,255,0.8)'
+                              >
+                                Blood Group
+                              </Typography>
+                              <Typography
+                                variant='h6'
+                                fontWeight={600}
+                                color='white'
+                              >
+                                {patient.medicalHistory.bloodGroup}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   )}
                   {patient.medicalHistory.genotype && (
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Genotype
-                      </Typography>
-                      <Typography variant='body1'>
-                        {patient.medicalHistory.genotype}
-                      </Typography>
-                    </Box>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Card
+                        sx={{
+                          background:
+                            'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                          color: 'white',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: -20,
+                            right: -20,
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                          }}
+                        />
+                        <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                          <Box display='flex' alignItems='center' gap={2}>
+                            <MedicalServices sx={{ fontSize: 24 }} />
+                            <Box>
+                              <Typography
+                                variant='body2'
+                                color='rgba(255,255,255,0.8)'
+                              >
+                                Genotype
+                              </Typography>
+                              <Typography
+                                variant='h6'
+                                fontWeight={600}
+                                color='white'
+                              >
+                                {patient.medicalHistory.genotype}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   )}
                   {patient.medicalHistory.height && (
-                    <Box>
-                      <Typography variant='body2' color='text.secondary'>
-                        Height
-                      </Typography>
-                      <Typography variant='body1'>
-                        {patient.medicalHistory.height}
-                      </Typography>
-                    </Box>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Card
+                        sx={{
+                          background:
+                            'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+                          color: 'white',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: -20,
+                            right: -20,
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                          }}
+                        />
+                        <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                          <Box display='flex' alignItems='center' gap={2}>
+                            <TrendingUp sx={{ fontSize: 24 }} />
+                            <Box>
+                              <Typography
+                                variant='body2'
+                                color='rgba(255,255,255,0.8)'
+                              >
+                                Height
+                              </Typography>
+                              <Typography
+                                variant='h6'
+                                fontWeight={600}
+                                color='white'
+                              >
+                                {patient.medicalHistory.height}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   )}
-                </Box>
+                </Grid>
               )}
 
               <Divider sx={{ my: 2 }} />
@@ -716,25 +1461,90 @@ const PatientDetailsPage: React.FC = () => {
               {isLoadingMedicalHistory ? (
                 <Skeleton variant='rectangular' height={200} />
               ) : medicalHistory && medicalHistory.length > 0 ? (
-                <List>
+                <Box>
                   {medicalHistory.map((entry, index) => (
-                    <ListItem key={index} divider>
-                      <ListItemIcon>
-                        <MedicalServices color='primary' />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={entry.entry}
-                        secondary={formatDate(entry.date)}
-                      />
-                    </ListItem>
+                    <Card
+                      key={index}
+                      sx={{
+                        mb: 2,
+                        background:
+                          'linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%)',
+                        border: '1px solid #e3f2fd',
+                        '&:hover': {
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                          transform: 'translateY(-2px)',
+                          transition: 'all 0.3s ease',
+                        },
+                      }}
+                    >
+                      <CardContent>
+                        <Box display='flex' alignItems='flex-start' gap={2}>
+                          <Box
+                            sx={{
+                              p: 1,
+                              borderRadius: 2,
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: 40,
+                              height: 40,
+                            }}
+                          >
+                            <MedicalServices sx={{ fontSize: 20 }} />
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography
+                              variant='body1'
+                              fontWeight={500}
+                              sx={{ mb: 1 }}
+                            >
+                              {entry.entry}
+                            </Typography>
+                            <Box display='flex' alignItems='center' gap={1}>
+                              <AccessTime
+                                sx={{ fontSize: 16, color: 'text.secondary' }}
+                              />
+                              <Typography
+                                variant='body2'
+                                color='text.secondary'
+                              >
+                                {formatDate(entry.date)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
                   ))}
-                </List>
-              ) : (
-                <Box textAlign='center' py={4}>
-                  <Typography variant='body1' color='text.secondary'>
-                    No medical history entries found
-                  </Typography>
                 </Box>
+              ) : (
+                <Card
+                  sx={{
+                    textAlign: 'center',
+                    py: 6,
+                    background:
+                      'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                    color: 'text.secondary',
+                  }}
+                >
+                  <CardContent>
+                    <MedicalServices
+                      sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }}
+                    />
+                    <Typography
+                      variant='h6'
+                      color='text.secondary'
+                      sx={{ mb: 1 }}
+                    >
+                      No Medical History
+                    </Typography>
+                    <Typography variant='body2' color='text.secondary'>
+                      No medical history entries found for this patient
+                    </Typography>
+                  </CardContent>
+                </Card>
               )}
             </TabPanel>
           </Card>

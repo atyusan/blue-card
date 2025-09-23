@@ -80,12 +80,24 @@ export class BillingController {
     required: false,
     description: 'Search by invoice number, patient name, or patient ID',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
   findAllInvoices(
     @Query('patientId') patientId?: string,
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.billingService.findAllInvoices({
       patientId,
@@ -93,6 +105,8 @@ export class BillingController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       search,
+      page,
+      limit,
     });
   }
 

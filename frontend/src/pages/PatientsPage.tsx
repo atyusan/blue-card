@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
+  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -26,6 +27,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  Stack,
 } from '@mui/material';
 import {
   Search,
@@ -35,6 +40,11 @@ import {
   Delete,
   Visibility,
   Upload,
+  Person,
+  Male,
+  Female,
+  CheckCircle,
+  LocalHospital,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../components/common/PageHeader';
@@ -42,7 +52,7 @@ import Breadcrumb from '../components/common/Breadcrumb';
 import { patientService } from '../services/patient.service';
 import { formatDate, getInitials } from '../utils';
 import toast from 'react-hot-toast';
-import type { Patient, PaginatedResponse } from '../types';
+import type { Patient, PaginatedResponse, PatientStats } from '../types';
 
 const PatientsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -57,6 +67,12 @@ const PatientsPage: React.FC = () => {
     null
   );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    gender: '',
+    status: '',
+    isActive: '',
+  });
 
   // Query parameters
   const queryParams = useMemo(
@@ -64,8 +80,11 @@ const PatientsPage: React.FC = () => {
       page: page + 1,
       limit: rowsPerPage,
       search: searchQuery || undefined,
+      gender: filters.gender || undefined,
+      status: filters.status || undefined,
+      isActive: filters.isActive ? filters.isActive === 'true' : undefined,
     }),
-    [page, rowsPerPage, searchQuery]
+    [page, rowsPerPage, searchQuery, filters]
   );
 
   // Fetch patients
@@ -79,6 +98,26 @@ const PatientsPage: React.FC = () => {
     queryFn: () => patientService.getPatients(queryParams),
     placeholderData: (previousData) => previousData,
   });
+
+  // Fetch patient statistics
+  const {
+    data: patientStats,
+    isLoading: isLoadingStats,
+    error: statsError,
+  } = useQuery<PatientStats>({
+    queryKey: ['patient-stats'],
+    queryFn: () => patientService.getPatientStats(),
+  });
+
+  // Log stats when they load
+  useEffect(() => {
+    if (patientStats) {
+      console.log('✅ Patient stats loaded:', patientStats);
+    }
+    if (statsError) {
+      console.error('❌ Patient stats error:', statsError);
+    }
+  }, [patientStats, statsError]);
 
   // Delete patient mutation
   const deletePatientMutation = useMutation({
@@ -172,6 +211,30 @@ const PatientsPage: React.FC = () => {
     }
   };
 
+  const handleFilterToggle = () => {
+    setShowFilters(!showFilters);
+  };
+
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      gender: '',
+      status: '',
+      isActive: '',
+    });
+    setPage(0);
+  };
+
+  const handleApplyFilters = () => {
+    setPage(0);
+  };
+
   const getGenderColor = (gender: string) => {
     switch (gender.toLowerCase()) {
       case 'male':
@@ -261,6 +324,254 @@ const PatientsPage: React.FC = () => {
         showActions={true}
       />
 
+      {/* Overview Cards */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(5, 1fr)',
+          },
+          gap: 3,
+          mb: 3,
+        }}
+      >
+        <Box>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+              <Box
+                display='flex'
+                alignItems='center'
+                justifyContent='space-between'
+              >
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='white'>
+                    {isLoadingStats ? (
+                      <Skeleton variant='text' width={60} height={40} />
+                    ) : statsError ? (
+                      'Error'
+                    ) : (
+                      patientStats?.totalPatients || 0
+                    )}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    Total Patients
+                  </Typography>
+                </Box>
+                <Person sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Box>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+              <Box
+                display='flex'
+                alignItems='center'
+                justifyContent='space-between'
+              >
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='white'>
+                    {isLoadingStats ? (
+                      <Skeleton variant='text' width={60} height={40} />
+                    ) : statsError ? (
+                      'Error'
+                    ) : (
+                      patientStats?.malePatients || 0
+                    )}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    Male Patients
+                  </Typography>
+                </Box>
+                <Male sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Box>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+              <Box
+                display='flex'
+                alignItems='center'
+                justifyContent='space-between'
+              >
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='white'>
+                    {isLoadingStats ? (
+                      <Skeleton variant='text' width={60} height={40} />
+                    ) : statsError ? (
+                      'Error'
+                    ) : (
+                      patientStats?.femalePatients || 0
+                    )}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    Female Patients
+                  </Typography>
+                </Box>
+                <Female sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Box>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+              <Box
+                display='flex'
+                alignItems='center'
+                justifyContent='space-between'
+              >
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='white'>
+                    {isLoadingStats ? (
+                      <Skeleton variant='text' width={60} height={40} />
+                    ) : statsError ? (
+                      'Error'
+                    ) : (
+                      patientStats?.activePatients || 0
+                    )}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    Active Patients
+                  </Typography>
+                </Box>
+                <CheckCircle
+                  sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Box>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+              }}
+            />
+            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+              <Box
+                display='flex'
+                alignItems='center'
+                justifyContent='space-between'
+              >
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='white'>
+                    {isLoadingStats ? (
+                      <Skeleton variant='text' width={60} height={40} />
+                    ) : statsError ? (
+                      'Error'
+                    ) : (
+                      patientStats?.admittedPatients || 0
+                    )}
+                  </Typography>
+                  <Typography variant='body2' color='rgba(255,255,255,0.8)'>
+                    Admitted Patients
+                  </Typography>
+                </Box>
+                <LocalHospital
+                  sx={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
+
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <Box p={3}>
@@ -281,11 +592,10 @@ const PatientsPage: React.FC = () => {
             <Button
               variant='outlined'
               startIcon={<FilterList />}
-              onClick={() => {
-                /* Open filter dialog */
-              }}
+              onClick={handleFilterToggle}
+              color={showFilters ? 'primary' : 'inherit'}
             >
-              Filter
+              {showFilters ? 'Hide Filters' : 'Filter'}
             </Button>
             <Button
               variant='outlined'
@@ -299,6 +609,270 @@ const PatientsPage: React.FC = () => {
           </Box>
         </Box>
       </Card>
+
+      {/* Inline Filter Section */}
+      {showFilters && (
+        <Card
+          sx={{
+            mb: 3,
+            animation: 'fadeIn 0.3s ease-in-out',
+            '@keyframes fadeIn': {
+              from: { opacity: 0, transform: 'translateY(-10px)' },
+              to: { opacity: 1, transform: 'translateY(0)' },
+            },
+          }}
+        >
+          <CardContent>
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                variant='h6'
+                sx={{
+                  mb: 3,
+                  fontWeight: 600,
+                  color: 'text.primary',
+                }}
+              >
+                Filter Patients
+              </Typography>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={3}
+                alignItems={{ xs: 'stretch', sm: 'flex-end' }}
+                sx={{ mb: 2 }}
+              >
+                <FormControl
+                  sx={{
+                    minWidth: { xs: '100%', sm: 160 },
+                    flex: { xs: 1, sm: '0 0 auto' },
+                  }}
+                >
+                  <InputLabel
+                    sx={{
+                      fontSize: '0.875rem',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  >
+                    Gender
+                  </InputLabel>
+                  <Select
+                    value={filters.gender}
+                    onChange={(e) =>
+                      handleFilterChange('gender', e.target.value)
+                    }
+                    label='Gender'
+                    size='small'
+                    sx={{
+                      '& .MuiSelect-select': {
+                        padding: '8px 12px',
+                        fontSize: '0.875rem',
+                      },
+                    }}
+                  >
+                    <MenuItem value=''>All Genders</MenuItem>
+                    <MenuItem value='MALE'>Male</MenuItem>
+                    <MenuItem value='FEMALE'>Female</MenuItem>
+                    <MenuItem value='OTHER'>Other</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl
+                  sx={{
+                    minWidth: { xs: '100%', sm: 160 },
+                    flex: { xs: 1, sm: '0 0 auto' },
+                  }}
+                >
+                  <InputLabel
+                    sx={{
+                      fontSize: '0.875rem',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  >
+                    Status
+                  </InputLabel>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) =>
+                      handleFilterChange('status', e.target.value)
+                    }
+                    label='Status'
+                    size='small'
+                    sx={{
+                      '& .MuiSelect-select': {
+                        padding: '8px 12px',
+                        fontSize: '0.875rem',
+                      },
+                    }}
+                  >
+                    <MenuItem value=''>All Statuses</MenuItem>
+                    <MenuItem value='Active'>Active</MenuItem>
+                    <MenuItem value='Inactive'>Inactive</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl
+                  sx={{
+                    minWidth: { xs: '100%', sm: 160 },
+                    flex: { xs: 1, sm: '0 0 auto' },
+                  }}
+                >
+                  <InputLabel
+                    sx={{
+                      fontSize: '0.875rem',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  >
+                    Active Status
+                  </InputLabel>
+                  <Select
+                    value={filters.isActive}
+                    onChange={(e) =>
+                      handleFilterChange('isActive', e.target.value)
+                    }
+                    label='Active Status'
+                    size='small'
+                    sx={{
+                      '& .MuiSelect-select': {
+                        padding: '8px 12px',
+                        fontSize: '0.875rem',
+                      },
+                    }}
+                  >
+                    <MenuItem value=''>All</MenuItem>
+                    <MenuItem value='true'>Active Only</MenuItem>
+                    <MenuItem value='false'>Inactive Only</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 2,
+                    alignItems: 'center',
+                    flex: { xs: 1, sm: '0 0 auto' },
+                    justifyContent: { xs: 'center', sm: 'flex-start' },
+                    mt: { xs: 1, sm: 0 },
+                  }}
+                >
+                  <Button
+                    variant='outlined'
+                    onClick={handleClearFilters}
+                    size='small'
+                    color='inherit'
+                    sx={{
+                      minWidth: 100,
+                      height: 36,
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      textTransform: 'none',
+                      borderColor: 'grey.300',
+                      color: 'text.secondary',
+                      '&:hover': {
+                        borderColor: 'grey.400',
+                        backgroundColor: 'grey.50',
+                      },
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                  <Button
+                    variant='contained'
+                    onClick={handleApplyFilters}
+                    size='small'
+                    sx={{
+                      minWidth: 100,
+                      height: 36,
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      textTransform: 'none',
+                      boxShadow: 'none',
+                      '&:hover': {
+                        boxShadow: 1,
+                      },
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </Box>
+              </Stack>
+            </Box>
+
+            {/* Active Filters Display */}
+            {(filters.gender || filters.status || filters.isActive) && (
+              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <Typography
+                  variant='subtitle2'
+                  sx={{
+                    mb: 2,
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Active Filters:
+                </Typography>
+                <Box display='flex' gap={1.5} flexWrap='wrap'>
+                  {filters.gender && (
+                    <Chip
+                      label={`Gender: ${filters.gender}`}
+                      onDelete={() => handleFilterChange('gender', '')}
+                      size='small'
+                      color='primary'
+                      variant='outlined'
+                      sx={{
+                        fontSize: '0.75rem',
+                        height: 28,
+                        '& .MuiChip-deleteIcon': {
+                          fontSize: '1rem',
+                        },
+                      }}
+                    />
+                  )}
+                  {filters.status && (
+                    <Chip
+                      label={`Status: ${filters.status}`}
+                      onDelete={() => handleFilterChange('status', '')}
+                      size='small'
+                      color='primary'
+                      variant='outlined'
+                      sx={{
+                        fontSize: '0.75rem',
+                        height: 28,
+                        '& .MuiChip-deleteIcon': {
+                          fontSize: '1rem',
+                        },
+                      }}
+                    />
+                  )}
+                  {filters.isActive && (
+                    <Chip
+                      label={`Active: ${
+                        filters.isActive === 'true' ? 'Yes' : 'No'
+                      }`}
+                      onDelete={() => handleFilterChange('isActive', '')}
+                      size='small'
+                      color='primary'
+                      variant='outlined'
+                      sx={{
+                        fontSize: '0.75rem',
+                        height: 28,
+                        '& .MuiChip-deleteIcon': {
+                          fontSize: '1rem',
+                        },
+                      }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Patients Table */}
       <Card>

@@ -111,6 +111,8 @@ export class BillingService {
     startDate?: Date;
     endDate?: Date;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
 
@@ -149,28 +151,45 @@ export class BillingService {
       ];
     }
 
-    return await this.prisma.invoice.findMany({
-      where,
-      include: {
-        patient: {
-          select: {
-            id: true,
-            patientId: true,
-            firstName: true,
-            lastName: true,
-            phoneNumber: true,
-            email: true,
+    const page = query?.page || 1;
+    const limit = query?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              patientId: true,
+              firstName: true,
+              lastName: true,
+              phoneNumber: true,
+              email: true,
+            },
           },
-        },
-        charges: {
-          include: {
-            service: true,
+          charges: {
+            include: {
+              service: true,
+            },
           },
+          payments: true,
         },
-        payments: true,
-      },
-      orderBy: { issuedDate: 'desc' },
-    });
+        orderBy: { issuedDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    return {
+      data: invoices,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findInvoiceById(id: string) {

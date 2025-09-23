@@ -121,6 +121,8 @@ export class PatientsService {
   async findAll(query?: {
     search?: string;
     isActive?: boolean;
+    gender?: string;
+    status?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -130,6 +132,19 @@ export class PatientsService {
 
     if (query?.isActive !== undefined) {
       where.isActive = query.isActive;
+    }
+
+    if (query?.gender) {
+      where.gender = query.gender;
+    }
+
+    if (query?.status) {
+      // Map status to isActive for now, since we don't have a separate status field
+      if (query.status === 'Active') {
+        where.isActive = true;
+      } else if (query.status === 'Inactive') {
+        where.isActive = false;
+      }
     }
 
     if (query?.search) {
@@ -201,6 +216,35 @@ export class PatientsService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async getPatientStats() {
+    const [
+      totalPatients,
+      malePatients,
+      femalePatients,
+      activePatients,
+      admittedPatients,
+    ] = await Promise.all([
+      this.prisma.patient.count(),
+      this.prisma.patient.count({ where: { gender: 'MALE' } }),
+      this.prisma.patient.count({ where: { gender: 'FEMALE' } }),
+      this.prisma.patient.count({ where: { isActive: true } }),
+      this.prisma.admission.count({
+        where: {
+          status: 'ADMITTED',
+          dischargeDate: null, // Only count currently admitted patients
+        },
+      }),
+    ]);
+
+    return {
+      totalPatients,
+      malePatients,
+      femalePatients,
+      activePatients,
+      admittedPatients,
     };
   }
 

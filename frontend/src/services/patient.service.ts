@@ -17,16 +17,11 @@ export interface PatientQueryParams {
 }
 
 export interface PatientStats {
-  total: number;
-  active: number;
-  inactive: number;
-  newThisMonth: number;
-  averageAge: number;
-  genderDistribution: {
-    male: number;
-    female: number;
-    other: number;
-  };
+  totalPatients: number;
+  malePatients: number;
+  femalePatients: number;
+  activePatients: number;
+  admittedPatients: number;
 }
 
 class PatientService {

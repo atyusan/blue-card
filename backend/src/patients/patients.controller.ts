@@ -60,6 +60,18 @@ export class PatientsController {
     description: 'Filter by active status',
   })
   @ApiQuery({
+    name: 'gender',
+    required: false,
+    description: 'Filter by gender',
+    enum: ['MALE', 'FEMALE', 'OTHER'],
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status',
+    enum: ['Active', 'Inactive'],
+  })
+  @ApiQuery({
     name: 'page',
     required: false,
     description: 'Page number for pagination',
@@ -86,6 +98,8 @@ export class PatientsController {
     @Query('search') search?: string,
     @Query('isActive', new ParseBoolPipe({ optional: true }))
     isActive?: boolean,
+    @Query('gender') gender?: string,
+    @Query('status') status?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('sortBy') sortBy?: string,
@@ -94,11 +108,24 @@ export class PatientsController {
     return this.patientsService.findAll({
       search,
       isActive,
+      gender,
+      status,
       page,
       limit,
       sortBy,
       sortOrder,
     });
+  }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get patient statistics' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Patient statistics including total, male, female, active, and admitted counts',
+  })
+  getStats() {
+    return this.patientsService.getPatientStats();
   }
 
   @Get(':id')

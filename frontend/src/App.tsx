@@ -12,6 +12,8 @@ import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PatientsPage from './pages/PatientsPage';
+import AddPatientPage from './pages/AddPatientPage';
+import PatientDetailsPage from './pages/PatientDetailsPage';
 import { StaffPage } from './pages/StaffPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
 import { ServicesPage } from './pages/ServicesPage';
@@ -82,6 +84,33 @@ const AppRoutes: React.FC = () => {
           element={
             <PermissionGuard permissions={['view_patients']}>
               <PatientsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='patients/add'
+          element={
+            <PermissionGuard permissions={['create_patients']}>
+              <AddPatientPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='patients/:id'
+          element={
+            <PermissionGuard permissions={['view_patients']}>
+              <PatientDetailsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='patients/:id/edit'
+          element={
+            <PermissionGuard permissions={['edit_patients']}>
+              <AddPatientPage />
             </PermissionGuard>
           }
         />

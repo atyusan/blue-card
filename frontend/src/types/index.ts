@@ -72,6 +72,14 @@ export interface InsuranceInfo {
   groupNumber?: string;
 }
 
+export interface PatientStats {
+  totalPatients: number;
+  malePatients: number;
+  femalePatients: number;
+  activePatients: number;
+  admittedPatients: number;
+}
+
 // Service Types
 export interface Service {
   id: string;
