@@ -125,6 +125,33 @@ const AppRoutes: React.FC = () => {
         />
 
         <Route
+          path='staff/add'
+          element={
+            <PermissionGuard permissions={['create_staff']}>
+              <StaffPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='staff/:id'
+          element={
+            <PermissionGuard permissions={['view_staff']}>
+              <StaffPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='staff/:id/edit'
+          element={
+            <PermissionGuard permissions={['edit_staff']}>
+              <StaffPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
           path='appointments'
           element={
             <PermissionGuard permissions={['view_appointments']}>

@@ -124,6 +124,45 @@ export const usePermissions = () => {
     );
   }, [hasPermission, isAdmin]);
 
+  // Staff permission methods
+  const canViewStaff = useCallback((): boolean => {
+    return (
+      hasPermission('view_staff') || hasPermission('manage_staff') || isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
+  const canManageStaff = useCallback((): boolean => {
+    return (
+      hasPermission('manage_staff') ||
+      hasPermission('create_staff') ||
+      hasPermission('edit_staff') ||
+      hasPermission('delete_staff') ||
+      isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
+  const canCreateStaff = useCallback((): boolean => {
+    return (
+      hasPermission('create_staff') ||
+      hasPermission('manage_staff') ||
+      isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
+  const canEditStaff = useCallback((): boolean => {
+    return (
+      hasPermission('edit_staff') || hasPermission('manage_staff') || isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
+  const canDeleteStaff = useCallback((): boolean => {
+    return (
+      hasPermission('delete_staff') ||
+      hasPermission('manage_staff') ||
+      isAdmin()
+    );
+  }, [hasPermission, isAdmin]);
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -139,6 +178,11 @@ export const usePermissions = () => {
     canViewTemporaryPermissions,
     canViewSystemSettings,
     canManageRoles,
+    canViewStaff,
+    canManageStaff,
+    canCreateStaff,
+    canEditStaff,
+    canDeleteStaff,
     user,
   };
 };

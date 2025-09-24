@@ -32,6 +32,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { StaffModule } from './staff/staff.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionTemplatesModule } from './permission-templates/permission-templates.module';
 import { TemporaryPermissionsModule } from './temporary-permissions/temporary-permissions.module';
@@ -82,6 +83,7 @@ import { PermissionRequestsModule } from './permission-requests/permission-reque
     AppointmentsModule,
     NotificationsModule,
     DepartmentsModule,
+    StaffModule,
     RolesModule,
     PermissionTemplatesModule,
     TemporaryPermissionsModule,

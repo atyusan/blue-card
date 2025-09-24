@@ -6,7 +6,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { API_BASE_URL, API_TIMEOUT, STORAGE_KEYS } from '../constants';
-import { getLocalStorage, removeLocalStorage } from '../utils';
+import { removeLocalStorage } from '../utils';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -105,7 +105,7 @@ export const apiError = (error: AxiosError): string => {
     typeof error.response.data === 'object' &&
     'message' in error.response.data
   ) {
-    return (error.response.data as any).message;
+    return (error.response.data as { message: string }).message;
   }
 
   if (error.response?.data && typeof error.response.data === 'string') {
@@ -127,7 +127,7 @@ export const http = {
 
   post: <T>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: AxiosRequestConfig
   ): Promise<T> => {
     return api.post(url, data, config).then(apiResponse);
@@ -135,7 +135,7 @@ export const http = {
 
   put: <T>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: AxiosRequestConfig
   ): Promise<T> => {
     return api.put(url, data, config).then(apiResponse);
@@ -143,7 +143,7 @@ export const http = {
 
   patch: <T>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: AxiosRequestConfig
   ): Promise<T> => {
     return api.patch(url, data, config).then(apiResponse);
