@@ -1,5 +1,5 @@
 import { apiClient } from '../lib/api-client';
-import type { Service } from '../types';
+import type { Service } from '../types/department';
 
 export interface ServiceQueryParams {
   categoryId?: string;

@@ -6,7 +6,9 @@ import {
   IsNumber,
   IsBoolean,
   IsArray,
-  IsUUID,
+  IsIn,
+  Min,
+  Max,
 } from 'class-validator';
 import { AppointmentType, AppointmentPriority, SlotType } from '@prisma/client';
 
@@ -153,11 +155,11 @@ export class CreateAppointmentSlotDto {
   @IsNumber()
   maxBookings?: number;
 
-  @IsUUID()
+  @IsString()
   providerId: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   resourceId?: string;
 
   @IsOptional()
@@ -273,8 +275,17 @@ export class CreateProviderScheduleDto {
   @IsString()
   providerId: string;
 
-  @IsNumber()
-  dayOfWeek: number;
+  @IsString()
+  @IsIn([
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
+  ])
+  dayOfWeek: string;
 
   @IsString()
   startTime: string;
@@ -284,27 +295,21 @@ export class CreateProviderScheduleDto {
 
   @IsOptional()
   @IsString()
-  breakStart?: string;
+  breakStartTime?: string;
 
   @IsOptional()
   @IsString()
-  breakEnd?: string;
+  breakEndTime?: string;
 
   @IsOptional()
   @IsBoolean()
-  isAvailable?: boolean;
+  isWorking?: boolean;
 
   @IsOptional()
   @IsNumber()
-  maxAppointments?: number;
-
-  @IsOptional()
-  @IsNumber()
-  slotDuration?: number;
-
-  @IsOptional()
-  @IsNumber()
-  bufferTime?: number;
+  @Min(1)
+  @Max(10)
+  maxAppointmentsPerHour?: number;
 
   @IsOptional()
   @IsString()

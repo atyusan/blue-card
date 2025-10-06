@@ -19,7 +19,6 @@ import {
   IsEnum,
   IsNumber,
   IsBoolean,
-  IsUUID,
 } from 'class-validator';
 import {
   PaymentMethod,
@@ -59,11 +58,11 @@ export class UpdateAppointmentSlotDto {
   maxBookings?: number;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   providerId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   resourceId?: string;
 
   @IsOptional()

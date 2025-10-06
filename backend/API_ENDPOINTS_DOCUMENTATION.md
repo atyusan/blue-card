@@ -387,7 +387,30 @@ Authorization: Bearer <your-jwt-token>
 
 ---
 
-## 14. Reporting & Analytics
+## 14. Service Providers
+
+### Base Path: `/staff/service-providers`
+
+#### Service Provider Management
+
+| Method  | Endpoint                                                  | Description                             | Query Parameters                                            | Response                          |
+| ------- | --------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------- | --------------------------------- |
+| `GET`   | `/staff/service-providers`                                | Get all service providers               | `search`, `departmentId`, `specialization`, `page`, `limit` | Service provider list (paginated) |
+| `GET`   | `/staff/service-providers/stats`                          | Get service provider statistics         | -                                                           | Service provider statistics       |
+| `GET`   | `/staff/service-providers/department/:id`                 | Get service providers by department     | -                                                           | Department service providers      |
+| `GET`   | `/staff/service-providers/specialization/:specialization` | Get service providers by specialization | -                                                           | Specialized service providers     |
+| `PATCH` | `/staff/:id/service-provider-status`                      | Update service provider status          | `{ serviceProvider: boolean }`                              | Updated staff member              |
+
+#### Provider Service Validation
+
+| Method | Endpoint                                                           | Description                         | Request Body | Response                |
+| ------ | ------------------------------------------------------------------ | ----------------------------------- | ------------ | ----------------------- |
+| `GET`  | `/appointments/providers/:providerId/services`                     | Get services available to provider  | -            | Available services list |
+| `POST` | `/appointments/providers/:providerId/services/:serviceId/validate` | Validate provider access to service | -            | Validation result       |
+
+---
+
+## 15. Reporting & Analytics
 
 ### Base Path: `/reporting`
 

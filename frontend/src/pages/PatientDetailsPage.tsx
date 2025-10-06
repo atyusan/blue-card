@@ -57,6 +57,7 @@ import {
   History,
   MoreVert,
   Print,
+  Info,
   Share,
   Download,
   TrendingUp,
@@ -1047,6 +1048,91 @@ const PatientDetailsPage: React.FC = () => {
                   New Appointment
                 </Button>
               </Box>
+
+              {/* Appointment Summary Stats */}
+              {appointments && appointments.length > 0 && (
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Typography
+                          variant='h6'
+                          color='primary'
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {appointments.length}
+                        </Typography>
+                        <Typography variant='body2' color='text.secondary'>
+                          Total Appointments
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Typography
+                          variant='h6'
+                          color='success.main'
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {
+                            appointments.filter(
+                              (apt) => apt.status === 'COMPLETED'
+                            ).length
+                          }
+                        </Typography>
+                        <Typography variant='body2' color='text.secondary'>
+                          Completed
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Typography
+                          variant='h6'
+                          color='warning.main'
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {
+                            appointments.filter(
+                              (apt) =>
+                                apt.status === 'SCHEDULED' ||
+                                apt.status === 'CONFIRMED'
+                            ).length
+                          }
+                        </Typography>
+                        <Typography variant='body2' color='text.secondary'>
+                          Upcoming
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card>
+                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Typography
+                          variant='h6'
+                          color='error.main'
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {
+                            appointments.filter(
+                              (apt) => apt.priority === 'EMERGENCY'
+                            ).length
+                          }
+                        </Typography>
+                        <Typography variant='body2' color='text.secondary'>
+                          Emergency Visits
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              )}
+
               {isLoadingAppointments ? (
                 <Skeleton variant='rectangular' height={200} />
               ) : appointments && appointments.length > 0 ? (
@@ -1057,6 +1143,8 @@ const PatientDetailsPage: React.FC = () => {
                         <TableCell>Date & Time</TableCell>
                         <TableCell>Service</TableCell>
                         <TableCell>Provider</TableCell>
+                        <TableCell>Priority</TableCell>
+                        <TableCell>Duration</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
@@ -1065,11 +1153,63 @@ const PatientDetailsPage: React.FC = () => {
                       {appointments.map((appointment) => (
                         <TableRow key={appointment.id}>
                           <TableCell>
-                            {formatDate(appointment.appointmentDate)} at{' '}
-                            {appointment.appointmentTime}
+                            {formatDate(
+                              appointment.appointmentDate ||
+                                appointment.date ||
+                                appointment.scheduledStart ||
+                                new Date()
+                            )}{' '}
+                            at{' '}
+                            {appointment.appointmentTime ||
+                              appointment.time ||
+                              (appointment.scheduledStart
+                                ? new Date(
+                                    appointment.scheduledStart
+                                  ).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  })
+                                : 'N/A')}
                           </TableCell>
-                          <TableCell>{appointment.serviceName}</TableCell>
-                          <TableCell>{appointment.providerName}</TableCell>
+                          <TableCell>
+                            {(appointment.slot as any)?.specialty ||
+                              appointment.appointmentType?.replace(/_/g, ' ') ||
+                              'General Consultation'}
+                          </TableCell>
+                          <TableCell>
+                            {appointment.slot?.provider
+                              ? `${
+                                  (appointment.slot.provider as any).firstName
+                                } ${
+                                  (appointment.slot.provider as any).lastName
+                                }`
+                              : 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            {appointment.priority && (
+                              <Chip
+                                label={appointment.priority}
+                                color={
+                                  appointment.priority === 'EMERGENCY'
+                                    ? 'error'
+                                    : appointment.priority === 'URGENT'
+                                    ? 'warning'
+                                    : 'default'
+                                }
+                                size='small'
+                                variant='outlined'
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {appointment.duration || appointment.slot?.duration
+                              ? `${
+                                  appointment.duration ||
+                                  appointment.slot?.duration
+                                } min`
+                              : 'N/A'}
+                          </TableCell>
                           <TableCell>
                             <Chip
                               label={appointment.status}
@@ -1082,14 +1222,24 @@ const PatientDetailsPage: React.FC = () => {
                             />
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size='small'
-                              onClick={() =>
-                                navigate(`/appointments/${appointment.id}`)
-                              }
-                            >
-                              View
-                            </Button>
+                            <Stack direction='row' spacing={1}>
+                              <Button
+                                size='small'
+                                variant='outlined'
+                                onClick={() =>
+                                  navigate(`/appointments/${appointment.id}`)
+                                }
+                              >
+                                View
+                              </Button>
+                              {appointment.notes && (
+                                <Tooltip title={appointment.notes}>
+                                  <IconButton size='small'>
+                                    <Info />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       ))}

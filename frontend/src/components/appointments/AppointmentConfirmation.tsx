@@ -136,7 +136,7 @@ const AppointmentConfirmation: React.FC<AppointmentConfirmationProps> = ({
               Dr. {selectedProvider.firstName} {selectedProvider.lastName}
             </Typography>
             <Typography variant='body2' color='text.secondary'>
-              {(selectedProvider as any).department || 'General Medicine'}
+              {(selectedProvider as any).department?.name || 'General Medicine'}
             </Typography>
           </Grid>
 

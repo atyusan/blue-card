@@ -45,7 +45,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         id: true,
         employeeId: true,
         departmentId: true,
-        departmentRef: {
+        specialization: true,
+        licenseNumber: true,
+        serviceProvider: true,
+        hireDate: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        department: {
           select: {
             id: true,
             name: true,
@@ -71,9 +78,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      isActive: user.isActive,
       staffMemberId: staffMember?.id,
-      employeeId: staffMember?.employeeId,
-      department: staffMember?.departmentRef,
+      staffMember: staffMember,
       permissions: userPermissions,
     };
   }

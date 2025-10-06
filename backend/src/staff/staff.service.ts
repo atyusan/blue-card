@@ -73,9 +73,9 @@ export class StaffService {
         userId: user.id,
         employeeId: createStaffDto.employeeId,
         departmentId: createStaffDto.departmentId,
-        department: createStaffDto.department,
         specialization: createStaffDto.specialization,
         licenseNumber: createStaffDto.licenseNumber,
+        serviceProvider: createStaffDto.serviceProvider ?? false,
         hireDate: new Date(createStaffDto.hireDate),
         isActive: createStaffDto.isActive ?? true,
       },
@@ -90,7 +90,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -140,8 +140,12 @@ export class StaffService {
     if (query?.search) {
       where.OR = [
         { employeeId: { contains: query.search, mode: 'insensitive' } },
-        { department: { contains: query.search, mode: 'insensitive' } },
         { specialization: { contains: query.search, mode: 'insensitive' } },
+        {
+          department: {
+            name: { contains: query.search, mode: 'insensitive' },
+          },
+        },
         {
           user: {
             OR: [
@@ -160,8 +164,10 @@ export class StaffService {
 
     if (query?.department) {
       where.department = {
-        contains: query.department,
-        mode: 'insensitive',
+        name: {
+          contains: query.department,
+          mode: 'insensitive',
+        },
       };
     }
 
@@ -205,7 +211,7 @@ export class StaffService {
               isActive: true,
             },
           },
-          departmentRef: {
+          department: {
             select: {
               id: true,
               name: true,
@@ -262,7 +268,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -314,7 +320,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -352,7 +358,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -388,7 +394,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -468,7 +474,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -527,7 +533,7 @@ export class StaffService {
             isActive: true,
           },
         },
-        departmentRef: {
+        department: {
           select: {
             id: true,
             name: true,
@@ -705,6 +711,256 @@ export class StaffService {
       totalSurgeries: staffMember._count.surgeries,
       totalAppointments: staffMember._count.appointments,
     };
+  }
+
+  // ===== SERVICE PROVIDER METHODS =====
+
+  async findServiceProviders(query?: {
+    departmentId?: string;
+    specialization?: string;
+    isActive?: boolean;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const where: Record<string, unknown> = {
+      serviceProvider: true, // Only staff members who can provide services
+    };
+
+    if (query?.search) {
+      where.OR = [
+        { employeeId: { contains: query.search, mode: 'insensitive' } },
+        { specialization: { contains: query.search, mode: 'insensitive' } },
+        {
+          department: {
+            name: { contains: query.search, mode: 'insensitive' },
+          },
+        },
+        {
+          user: {
+            OR: [
+              { firstName: { contains: query.search, mode: 'insensitive' } },
+              { lastName: { contains: query.search, mode: 'insensitive' } },
+              { email: { contains: query.search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ];
+    }
+
+    if (query?.departmentId) {
+      where.departmentId = query.departmentId;
+    }
+
+    if (query?.specialization) {
+      where.specialization = {
+        contains: query.specialization,
+        mode: 'insensitive',
+      };
+    }
+
+    if (query?.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    const page = query?.page || 1;
+    const limit = query?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const [serviceProviders, total] = await Promise.all([
+      this.prisma.staffMember.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              username: true,
+              isActive: true,
+            },
+          },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          _count: {
+            select: {
+              roleAssignments: {
+                where: { isActive: true },
+              },
+              appointments: true,
+            },
+          },
+        },
+        orderBy: [{ user: { firstName: 'asc' } }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.staffMember.count({ where }),
+    ]);
+
+    return {
+      data: serviceProviders,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findServiceProvidersByDepartment(departmentId: string) {
+    return this.prisma.staffMember.findMany({
+      where: {
+        departmentId,
+        serviceProvider: true,
+        isActive: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            username: true,
+            isActive: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        _count: {
+          select: {
+            appointments: true,
+          },
+        },
+      },
+      orderBy: { user: { firstName: 'asc' } },
+    });
+  }
+
+  async findServiceProvidersBySpecialization(specialization: string) {
+    return this.prisma.staffMember.findMany({
+      where: {
+        specialization: { contains: specialization, mode: 'insensitive' },
+        serviceProvider: true,
+        isActive: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            username: true,
+            isActive: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        _count: {
+          select: {
+            appointments: true,
+          },
+        },
+      },
+      orderBy: [{ user: { firstName: 'asc' } }],
+    });
+  }
+
+  async getServiceProviderStats() {
+    const [
+      totalServiceProviders,
+      activeServiceProviders,
+      inactiveServiceProviders,
+      serviceProvidersByDepartment,
+      serviceProvidersBySpecialization,
+    ] = await Promise.all([
+      this.prisma.staffMember.count({ where: { serviceProvider: true } }),
+      this.prisma.staffMember.count({
+        where: { serviceProvider: true, isActive: true },
+      }),
+      this.prisma.staffMember.count({
+        where: { serviceProvider: true, isActive: false },
+      }),
+      this.prisma.staffMember.groupBy({
+        by: ['departmentId'],
+        where: { serviceProvider: true, isActive: true },
+        _count: { id: true },
+      }),
+      this.prisma.staffMember.groupBy({
+        by: ['specialization'],
+        where: { serviceProvider: true, isActive: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    return {
+      totalServiceProviders,
+      activeServiceProviders,
+      inactiveServiceProviders,
+      serviceProvidersByDepartment: serviceProvidersByDepartment.map(
+        (item) => ({
+          departmentId: item.departmentId,
+          count: item._count.id,
+        }),
+      ),
+      serviceProvidersBySpecialization: serviceProvidersBySpecialization.map(
+        (item) => ({
+          specialization: item.specialization,
+          count: item._count.id,
+        }),
+      ),
+    };
+  }
+
+  async updateServiceProviderStatus(id: string, serviceProvider: boolean) {
+    const staffMember = await this.prisma.staffMember.findUnique({
+      where: { id },
+    });
+
+    if (!staffMember) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    return this.prisma.staffMember.update({
+      where: { id },
+      data: { serviceProvider },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            username: true,
+            isActive: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
   }
 
   // Helper methods for user creation

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -25,8 +25,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Grid,
-  Divider,
   Skeleton,
   TablePagination,
   Menu,
@@ -35,20 +33,11 @@ import {
 import {
   Search,
   FilterList,
-  Add,
   Edit,
   Delete,
   Visibility,
-  Refresh,
-  Download,
-  CalendarToday,
   Person,
-  LocalHospital,
   Schedule,
-  CheckCircle,
-  Cancel,
-  Warning,
-  Info,
   MoreVert,
   MedicalServices,
   Event,
@@ -60,11 +49,12 @@ import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
 import type { Appointment, AppointmentSearchResult } from '../types';
 import { formatDate, formatTime } from '../utils';
-import toast from 'react-hot-toast';
+import { useToast } from '../context/ToastContext';
 
 const AppointmentsPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
 
   // State management
   const [page, setPage] = useState(0);
@@ -113,13 +103,13 @@ const AppointmentsPage: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      toast.success('Appointment cancelled successfully');
+      showSuccess('Appointment cancelled successfully');
       setDeleteDialogOpen(false);
       setSelectedAppointment(null);
     },
     onError: (error) => {
       console.error('Cancel appointment error:', error);
-      toast.error('Failed to cancel appointment');
+      showError('Failed to cancel appointment');
     },
   });
 
@@ -185,18 +175,18 @@ const AppointmentsPage: React.FC = () => {
   const handleRefresh = async () => {
     try {
       await refetch();
-      toast.success('Appointment list refreshed');
-    } catch (error) {
-      toast.error('Failed to refresh appointment list');
+      showSuccess('Appointment list refreshed');
+    } catch {
+      showError('Failed to refresh appointment list');
     }
   };
 
   const handleExport = async () => {
     try {
       // This would typically export to CSV/Excel
-      toast.success('Exporting appointment list...');
-    } catch (error) {
-      toast.error('Failed to export appointment list');
+      showSuccess('Exporting appointment list...');
+    } catch {
+      showError('Failed to export appointment list');
     }
   };
 
@@ -373,10 +363,15 @@ const AppointmentsPage: React.FC = () => {
                       </Avatar>
                       <Box>
                         <Typography variant='body2' fontWeight={500}>
-                          {appointment.patientName || 'Unknown Patient'}
+                          {appointment.patient?.firstName &&
+                          appointment.patient?.lastName
+                            ? `${appointment.patient.firstName} ${appointment.patient.lastName}`
+                            : 'Unknown Patient'}
                         </Typography>
                         <Typography variant='caption' color='text.secondary'>
-                          ID: {appointment.patientId.slice(-8)}
+                          ID:{' '}
+                          {appointment.patient?.patientId ||
+                            appointment.patientId.slice(-8)}
                         </Typography>
                       </Box>
                     </Box>
@@ -385,33 +380,45 @@ const AppointmentsPage: React.FC = () => {
                     <Box display='flex' alignItems='center' gap={1}>
                       <MedicalServices color='primary' fontSize='small' />
                       <Typography variant='body2'>
-                        {appointment.serviceName || 'Unknown Service'}
+                        {appointment.appointmentType?.replace(/_/g, ' ') ||
+                          'Unknown Service'}
                       </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant='body2'>
-                      {appointment.providerName || 'Unknown Provider'}
+                      {appointment.slot?.provider?.user?.firstName &&
+                      appointment.slot?.provider?.user?.lastName
+                        ? `Dr. ${appointment.slot.provider.user.firstName} ${appointment.slot.provider.user.lastName}`
+                        : 'Unknown Provider'}
                     </Typography>
+                    {appointment.slot?.provider?.specialization && (
+                      <Typography variant='caption' color='text.secondary'>
+                        {appointment.slot.provider.specialization}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Box>
                       <Typography variant='body2' fontWeight={500}>
-                        {formatDate(
-                          appointment.appointmentDate || appointment.date || ''
-                        )}
+                        {formatDate(appointment.scheduledStart || '')}
                       </Typography>
                       <Typography variant='caption' color='text.secondary'>
-                        {formatTime(
-                          appointment.appointmentTime || appointment.time || ''
-                        )}
+                        {formatTime(appointment.scheduledStart || '')}
                       </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Chip
                       label={appointment.status}
-                      color={getStatusColor(appointment.status) as any}
+                      color={
+                        getStatusColor(appointment.status) as
+                          | 'success'
+                          | 'info'
+                          | 'warning'
+                          | 'error'
+                          | 'default'
+                      }
                       size='small'
                     />
                   </TableCell>
@@ -419,7 +426,14 @@ const AppointmentsPage: React.FC = () => {
                     {appointment.priority && (
                       <Chip
                         label={appointment.priority}
-                        color={getPriorityColor(appointment.priority) as any}
+                        color={
+                          getPriorityColor(appointment.priority) as
+                            | 'success'
+                            | 'info'
+                            | 'warning'
+                            | 'error'
+                            | 'default'
+                        }
                         size='small'
                         variant='outlined'
                       />

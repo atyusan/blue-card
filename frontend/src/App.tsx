@@ -19,6 +19,10 @@ import { DepartmentsPage } from './pages/DepartmentsPage';
 import { ServicesPage } from './pages/ServicesPage';
 import { RolesPage } from './pages/RolesPage';
 import AppointmentsPage from './pages/AppointmentsPage';
+import AppointmentDetailsPage from './pages/AppointmentDetailsPage';
+import CreateAppointmentPage from './pages/CreateAppointmentPage';
+import ProviderAvailabilityPage from './pages/ProviderAvailabilityPage';
+import TimeOffManagementPage from './pages/TimeOffManagementPage';
 import BillingPage from './pages/BillingPage';
 import { CashManagementPage } from './pages/CashManagementPage';
 import CashRequestsPage from './pages/CashRequestsPage';
@@ -156,6 +160,53 @@ const AppRoutes: React.FC = () => {
           element={
             <PermissionGuard permissions={['view_appointments']}>
               <AppointmentsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='appointments/create'
+          element={
+            <PermissionGuard permissions={['create_appointments']}>
+              <CreateAppointmentPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='appointments/:id'
+          element={
+            <PermissionGuard permissions={['view_appointments']}>
+              <AppointmentDetailsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='appointments/:id/edit'
+          element={
+            <PermissionGuard permissions={['edit_appointments']}>
+              <CreateAppointmentPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='provider/availability'
+          element={
+            <PermissionGuard permissions={['view_appointments']}>
+              <ProviderAvailabilityPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='timeoff-management'
+          element={
+            <PermissionGuard
+              permissions={['admin', 'manage_timeoff', 'hr_management']}
+            >
+              <TimeOffManagementPage />
             </PermissionGuard>
           }
         />

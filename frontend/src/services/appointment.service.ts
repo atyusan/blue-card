@@ -357,10 +357,10 @@ class AppointmentService {
     availabilityData: GetProviderAvailabilityData
   ): Promise<ProviderAvailabilityResponse> {
     const response = await http.get<ProviderAvailabilityResponse>(
-      `/appointments/provider-availability`,
+      `/appointments/availability/provider`,
       { params: availabilityData }
     );
-    return response.data;
+    return response;
   }
 
   async getProviderDateRangeAvailability(
@@ -372,7 +372,7 @@ class AppointmentService {
       `/appointments/provider-availability/date-range`,
       { params: availabilityData }
     );
-    return response.data;
+    return response;
   }
 
   // ===== STATISTICS & ANALYTICS =====
@@ -581,7 +581,17 @@ class AppointmentService {
   // ===== PROVIDER SCHEDULE MANAGEMENT =====
 
   // Create provider schedule
-  async createProviderSchedule(scheduleData: any): Promise<ProviderSchedule> {
+  async createProviderSchedule(scheduleData: {
+    providerId: string;
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+    breakStartTime?: string;
+    breakEndTime?: string;
+    isWorking?: boolean;
+    maxAppointmentsPerHour?: number;
+    notes?: string;
+  }): Promise<ProviderSchedule> {
     const response = await http.post<ProviderSchedule>(
       '/appointments/providers/schedules',
       scheduleData
@@ -590,7 +600,21 @@ class AppointmentService {
   }
 
   // Get all provider schedules
-  async getAllProviderSchedules(params: any = {}): Promise<any> {
+  async getAllProviderSchedules(
+    params: {
+      page?: number;
+      limit?: number;
+      providerId?: string;
+      dayOfWeek?: string;
+      isWorking?: boolean;
+    } = {}
+  ): Promise<{
+    schedules: ProviderSchedule[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const queryParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -598,9 +622,13 @@ class AppointmentService {
       }
     });
 
-    const response = await http.get(
-      `/appointments/providers/schedules?${queryParams.toString()}`
-    );
+    const response = await http.get<{
+      schedules: ProviderSchedule[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/appointments/providers/schedules?${queryParams.toString()}`);
     return response;
   }
 
@@ -615,7 +643,16 @@ class AppointmentService {
   // Update provider schedule
   async updateProviderSchedule(
     id: string,
-    scheduleData: Partial<ProviderSchedule>
+    scheduleData: Partial<{
+      dayOfWeek: string;
+      startTime: string;
+      endTime: string;
+      breakStartTime?: string;
+      breakEndTime?: string;
+      isWorking?: boolean;
+      maxAppointmentsPerHour?: number;
+      notes?: string;
+    }>
   ): Promise<ProviderSchedule> {
     const response = await http.patch<ProviderSchedule>(
       `/appointments/providers/schedules/${id}`,
@@ -678,6 +715,30 @@ class AppointmentService {
   // Delete provider time off
   async deleteProviderTimeOff(id: string): Promise<void> {
     await http.delete(`/appointments/providers/time-off/${id}`);
+  }
+
+  // Approve provider time off
+  async approveProviderTimeOff(
+    id: string,
+    data: { approvedBy: string; notes?: string }
+  ): Promise<ProviderTimeOff> {
+    const response = await http.post<ProviderTimeOff>(
+      `/appointments/providers/time-off/${id}/approve`,
+      data
+    );
+    return response;
+  }
+
+  // Reject provider time off
+  async rejectProviderTimeOff(
+    id: string,
+    data: { approvedBy: string; notes?: string }
+  ): Promise<ProviderTimeOff> {
+    const response = await http.post<ProviderTimeOff>(
+      `/appointments/providers/time-off/${id}/reject`,
+      data
+    );
+    return response;
   }
 
   // ===== RESOURCE MANAGEMENT =====

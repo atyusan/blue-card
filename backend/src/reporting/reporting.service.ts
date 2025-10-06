@@ -187,6 +187,7 @@ export class ReportingService {
         doctor: {
           include: {
             user: true,
+            department: true,
           },
         },
       },
@@ -195,7 +196,7 @@ export class ReportingService {
     // Group by doctor/department
     const departmentPerformance = consultations.reduce((acc, consultation) => {
       const doctorName = `${consultation.doctor.user.firstName} ${consultation.doctor.user.lastName}`;
-      const department = consultation.doctor.department || 'General';
+      const department = consultation.doctor.department?.name || 'General';
 
       if (!acc[department]) {
         acc[department] = {
@@ -654,35 +655,50 @@ export class ReportingService {
       where: {
         appointmentDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, doctor: { include: { user: true } } },
+      include: {
+        patient: true,
+        doctor: { include: { user: true, department: true } },
+      },
     });
 
     const labOrders = await this.prisma.labOrder.findMany({
       where: {
         orderDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, doctor: { include: { user: true } } },
+      include: {
+        patient: true,
+        doctor: { include: { user: true, department: true } },
+      },
     });
 
     const prescriptions = await this.prisma.prescription.findMany({
       where: {
         prescriptionDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, doctor: { include: { user: true } } },
+      include: {
+        patient: true,
+        doctor: { include: { user: true, department: true } },
+      },
     });
 
     const surgeries = await this.prisma.surgery.findMany({
       where: {
         surgeryDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, surgeon: { include: { user: true } } },
+      include: {
+        patient: true,
+        surgeon: { include: { user: true, department: true } },
+      },
     });
 
     const admissions = await this.prisma.admission.findMany({
       where: {
         admissionDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, doctor: { include: { user: true } } },
+      include: {
+        patient: true,
+        doctor: { include: { user: true, department: true } },
+      },
     });
 
     // Calculate module-specific metrics
@@ -1216,7 +1232,10 @@ export class ReportingService {
       where: {
         appointmentDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, doctor: { include: { user: true } } },
+      include: {
+        patient: true,
+        doctor: { include: { user: true, department: true } },
+      },
     });
 
     const labOrders = await this.prisma.labOrder.findMany({
@@ -1237,7 +1256,10 @@ export class ReportingService {
       where: {
         surgeryDate: { gte: startDate, lte: endDate },
       },
-      include: { patient: true, surgeon: { include: { user: true } } },
+      include: {
+        patient: true,
+        surgeon: { include: { user: true, department: true } },
+      },
     });
 
     // Calculate efficiency metrics

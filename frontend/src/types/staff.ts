@@ -3,9 +3,15 @@ export interface StaffMember {
   id: string;
   userId: string;
   employeeId: string;
-  departmentId: string;
+  departmentId?: string;
+  department?: {
+    id: string;
+    name: string;
+    code: string;
+  };
   specialization?: string;
   licenseNumber?: string;
+  serviceProvider?: boolean;
   hireDate: string;
   isActive: boolean;
   createdAt: string;
@@ -16,6 +22,9 @@ export interface StaffMember {
     lastName: string;
     email: string;
     username?: string;
+    isActive: boolean;
   };
-  departmentRef?: any; // Will be typed as Department to avoid circular dependency
+  _count?: {
+    roleAssignments: number;
+  };
 }

@@ -5,9 +5,14 @@ export interface StaffMember {
   userId: string;
   employeeId: string;
   departmentId?: string;
-  department: string;
+  department?: {
+    id: string;
+    name: string;
+    code: string;
+  };
   specialization?: string;
   licenseNumber?: string;
+  serviceProvider?: boolean;
   hireDate: string;
   isActive: boolean;
   createdAt: string;
@@ -20,11 +25,6 @@ export interface StaffMember {
     username?: string;
     isActive: boolean;
   };
-  departmentRef?: {
-    id: string;
-    name: string;
-    code: string;
-  };
   _count?: {
     roleAssignments: number;
   };
@@ -36,21 +36,21 @@ export interface CreateStaffData {
   lastName: string;
   employeeId: string;
   departmentId?: string;
-  department: string;
   specialization?: string;
   licenseNumber?: string;
   hireDate: string;
   isActive?: boolean;
+  serviceProvider?: boolean;
 }
 
 export interface UpdateStaffData {
   employeeId?: string;
   departmentId?: string;
-  department?: string;
   specialization?: string;
   licenseNumber?: string;
   hireDate?: string;
   isActive?: boolean;
+  serviceProvider?: boolean;
 }
 
 export interface StaffQueryParams {
@@ -180,6 +180,80 @@ class StaffService {
   async getStaffStatsById(staffId: string): Promise<unknown> {
     const response = await http.get<unknown>(
       `${this.baseUrl}/${staffId}/stats`
+    );
+    return response;
+  }
+
+  // Service provider methods
+  async getServiceProviders(query?: {
+    search?: string;
+    departmentId?: string;
+    specialization?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedStaffResponse> {
+    const response = await http.get<PaginatedStaffResponse>(
+      `${this.baseUrl}/service-providers`,
+      {
+        params: query,
+      }
+    );
+    return response;
+  }
+
+  async getServiceProviderStats(): Promise<{
+    totalServiceProviders: number;
+    activeServiceProviders: number;
+    serviceProvidersByDepartment: Array<{
+      departmentId: string;
+      count: number;
+    }>;
+    serviceProvidersBySpecialization: Array<{
+      specialization: string;
+      count: number;
+    }>;
+  }> {
+    const response = await http.get<{
+      totalServiceProviders: number;
+      activeServiceProviders: number;
+      serviceProvidersByDepartment: Array<{
+        departmentId: string;
+        count: number;
+      }>;
+      serviceProvidersBySpecialization: Array<{
+        specialization: string;
+        count: number;
+      }>;
+    }>(`${this.baseUrl}/service-providers/stats`);
+    return response;
+  }
+
+  async getServiceProvidersByDepartment(
+    departmentId: string
+  ): Promise<StaffMember[]> {
+    const response = await http.get<StaffMember[]>(
+      `${this.baseUrl}/service-providers/department/${departmentId}`
+    );
+    return response;
+  }
+
+  async getServiceProvidersBySpecialization(
+    specialization: string
+  ): Promise<StaffMember[]> {
+    const response = await http.get<StaffMember[]>(
+      `${this.baseUrl}/service-providers/specialization/${specialization}`
+    );
+    return response;
+  }
+
+  async updateServiceProviderStatus(
+    staffId: string,
+    serviceProvider: boolean
+  ): Promise<StaffMember> {
+    const response = await http.patch<StaffMember>(
+      `${this.baseUrl}/${staffId}/service-provider-status`,
+      { serviceProvider }
     );
     return response;
   }

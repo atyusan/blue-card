@@ -116,6 +116,44 @@ export class ProviderTimeOffService {
     await this.prisma.providerTimeOff.delete({ where: { id } });
   }
 
+  async approve(
+    id: string,
+    approvedBy: string,
+    notes?: string,
+  ): Promise<TimeOffResponse> {
+    const entry = await this.findOne(id);
+
+    if (entry.status !== 'PENDING') {
+      throw new Error('Only pending requests can be approved');
+    }
+
+    return this.update(id, {
+      status: 'APPROVED',
+      approvedBy,
+      approvedAt: new Date(),
+      notes: notes || entry.notes,
+    });
+  }
+
+  async reject(
+    id: string,
+    approvedBy: string,
+    notes?: string,
+  ): Promise<TimeOffResponse> {
+    const entry = await this.findOne(id);
+
+    if (entry.status !== 'PENDING') {
+      throw new Error('Only pending requests can be rejected');
+    }
+
+    return this.update(id, {
+      status: 'REJECTED',
+      approvedBy,
+      approvedAt: new Date(),
+      notes: notes || entry.notes,
+    });
+  }
+
   private mapToResponse(e: any): TimeOffResponse {
     return {
       id: e.id,

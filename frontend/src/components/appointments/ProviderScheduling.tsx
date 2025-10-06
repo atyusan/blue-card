@@ -201,7 +201,8 @@ const ProviderScheduling: React.FC<ProviderSchedulingProps> = ({
                 Dr. {selectedProvider.firstName} {selectedProvider.lastName}
               </Typography>
               <Typography variant='body2' color='text.secondary'>
-                {(selectedProvider as any).department || 'General Medicine'}
+                {(selectedProvider as any).department?.name ||
+                  'General Medicine'}
               </Typography>
             </Box>
             <Button
@@ -244,7 +245,7 @@ const ProviderScheduling: React.FC<ProviderSchedulingProps> = ({
                   {providers?.data?.map((provider: any) => (
                     <MenuItem key={provider.id} value={provider.id}>
                       Dr. {provider.firstName} {provider.lastName} -{' '}
-                      {(provider as any).department || 'General Medicine'}
+                      {(provider as any).department?.name || 'General Medicine'}
                     </MenuItem>
                   ))}
                 </Select>

@@ -222,7 +222,7 @@ export const RoleDetails: React.FC<RoleDetailsProps> = ({
                             </div>
                             <div className='text-sm text-muted-foreground'>
                               {assignment.staffMember.employeeId} •{' '}
-                              {assignment.staffMember.departmentRef?.name ||
+                              {assignment.staffMember.department?.name ||
                                 'No department'}
                             </div>
                           </div>
@@ -273,8 +273,7 @@ export const RoleDetails: React.FC<RoleDetailsProps> = ({
                     {Object.entries(
                       role.staffRoleAssignments.reduce((acc, assignment) => {
                         const deptName =
-                          assignment.staffMember.departmentRef?.name ||
-                          'Unknown';
+                          assignment.staffMember.department?.name || 'Unknown';
                         acc[deptName] = (acc[deptName] || 0) + 1;
                         return acc;
                       }, {} as Record<string, number>)

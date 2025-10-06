@@ -13,32 +13,25 @@ import {
   Select,
   MenuItem,
   TextField,
-  IconButton,
-  Chip,
   Alert,
-  CircularProgress,
 } from '@mui/material';
-import { CalendarToday } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/context/ToastContext';
 
-// Import the working CustomCalendar component
-import CustomCalendar from '../components/appointments/CustomCalendar';
+// Import the new AppointmentCalendar component
+import AppointmentCalendar from '../components/AppointmentCalendar';
 
 // Import services
 import { patientService } from '../services/patient.service';
 import { serviceService } from '../services/service.service';
 import { appointmentService } from '../services/appointment.service';
+import { staffService } from '../services/staff.service';
 
 // Import types
-import type {
-  Patient,
-  Service,
-  User,
-  AppointmentSlot,
-  PaginatedResponse,
-} from '../types';
+import type { Patient, AppointmentSlot, PaginatedResponse } from '../types';
+import type { Service } from '../types/department';
+import type { StaffMember } from '../services/staff.service';
 
 const steps = [
   'Patient & Service Selection',
@@ -56,7 +49,9 @@ const CreateAppointmentPage: React.FC = () => {
   // State variables
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<User | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<StaffMember | null>(
+    null
+  );
   const [selectedSlot, setSelectedSlot] = useState<AppointmentSlot | null>(
     null
   );
@@ -66,96 +61,70 @@ const CreateAppointmentPage: React.FC = () => {
   const [reason, setReason] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [notes, setNotes] = useState('');
-  const [requiresPrePayment, setRequiresPrePayment] = useState(true);
-
-  // Custom calendar state variables
-  const [showDateTimePicker, setShowDateTimePicker] = useState(false);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<any>(null);
-  const [loadingAvailability, setLoadingAvailability] = useState(false);
-  const [availabilityData, setAvailabilityData] = useState<any>(null);
+  const [requiresPrePayment] = useState(true);
 
   // Fetch data
-  const { data: patients, isLoading: patientsLoading } = useQuery<
-    PaginatedResponse<Patient>
-  >({
+  const { data: patients } = useQuery<PaginatedResponse<Patient>>({
     queryKey: ['patients', { search: '' }],
     queryFn: () => patientService.getPatients({ search: '', limit: 50 }),
   });
 
-  const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
+  const { data: services } = useQuery<Service[]>({
     queryKey: ['services'],
     queryFn: async () => {
-      const response = await serviceService.getServices({ limit: 100 });
+      const response = await serviceService.getServices({});
       return Array.isArray(response) ? response : response.data || [];
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: providers, isLoading: providersLoading } = useQuery<
-    PaginatedResponse<any>
-  >({
-    queryKey: ['users', { role: 'DOCTOR', search: '' }],
+  const {
+    data: providers,
+    isLoading: providersLoading,
+    error: providersError,
+  } = useQuery({
+    queryKey: [
+      'service-providers',
+      { isActive: true, departmentId: selectedService?.departmentId },
+    ],
     queryFn: async () => {
-      try {
-        // Fetch users with DOCTOR role
-        const response = await fetch(
-          'http://localhost:3000/api/v1/users?role=DOCTOR&limit=50'
-        );
-        if (!response.ok) {
-          throw new Error('Failed to fetch doctors');
-        }
-        const data = await response.json();
-        console.log('Fetched doctors:', data);
-
-        // For now, we'll use these users but we need to map them to staff member IDs
-        // This is a temporary solution until we have proper staff member API
-        return data;
-      } catch (error) {
-        console.error('Error fetching doctors:', error);
-        return { data: [] };
-      }
+      const result = await staffService.getServiceProviders({
+        isActive: true,
+        limit: 100,
+        // Filter by department if a service is selected
+        ...(selectedService?.departmentId && {
+          departmentId: selectedService.departmentId,
+        }),
+      });
+      return result;
     },
+    staleTime: 5 * 60 * 1000,
+    // Only fetch providers if a service is selected
+    enabled: !!selectedService,
   });
 
-  // Fetch available slots
-  const {
-    data: availableSlots,
-    isLoading: slotsLoading,
-    refetch: refetchSlots,
-  } = useQuery<any[]>({
-    queryKey: ['available-slots', selectedProvider?.id, selectedDate],
+  // Fetch available slots for the selected provider
+  const { data: availableSlots } = useQuery<any[]>({
+    queryKey: ['available-slots', selectedProvider?.id],
     queryFn: async () => {
       if (!selectedProvider?.id) return [];
 
       try {
-        // Since slots use staff_member.id as providerId, we need to find the corresponding staff member
-        // For now, let's try to fetch all slots and filter by the user's name
-        // This is a temporary solution until we have proper user-staff mapping
+        // Fetch all available slots for the provider (not filtered by date)
         const response = await appointmentService.getAllSlots({
+          providerId: selectedProvider.id,
           isAvailable: true,
           isBookable: true,
         });
 
-        console.log('Fetched all slots:', response);
-
-        // Filter slots by provider name (this is not ideal but works for now)
-        if (response.slots) {
-          const filteredSlots = response.slots.filter((slot: any) => {
-            const providerName = `${slot.provider?.firstName} ${slot.provider?.lastName}`;
-            const selectedProviderName = `${selectedProvider.firstName} ${selectedProvider.lastName}`;
-            return providerName === selectedProviderName;
-          });
-          console.log('Filtered slots for provider:', filteredSlots);
-          return filteredSlots;
-        }
-
-        return [];
+        return response.slots || [];
       } catch (error) {
         console.error('Error fetching slots:', error);
         return [];
       }
     },
     enabled: Boolean(selectedProvider?.id),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Create appointment mutation
@@ -202,9 +171,13 @@ const CreateAppointmentPage: React.FC = () => {
 
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
+    // Reset provider when service changes
+    setSelectedProvider(null);
+    setSelectedSlot(null);
+    setSelectedDate(null);
   };
 
-  const handleProviderSelect = (provider: User) => {
+  const handleProviderSelect = (provider: StaffMember) => {
     setSelectedProvider(provider);
     setSelectedSlot(null);
     setSelectedDate(null);
@@ -214,15 +187,7 @@ const CreateAppointmentPage: React.FC = () => {
     setSelectedSlot(slot);
   };
 
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-    setSelectedSlot(null);
-    if (date && selectedProvider) {
-      refetchSlots();
-    }
-  };
-
-  const handleCreateAppointment = () => {
+  const handleSubmitAppointment = () => {
     if (
       !selectedPatient ||
       !selectedService ||
@@ -233,15 +198,37 @@ const CreateAppointmentPage: React.FC = () => {
       return;
     }
 
+    // Map frontend appointment types to backend expected values
+    const getBackendAppointmentType = (frontendType: string) => {
+      const typeMap: Record<string, string> = {
+        CONSULTATION: 'GENERAL_CONSULTATION',
+        FOLLOW_UP: 'FOLLOW_UP',
+        EMERGENCY: 'EMERGENCY',
+        ROUTINE_CHECKUP: 'PREVENTIVE_CARE',
+        SPECIALIST_REFERRAL: 'SPECIALIST_CONSULTATION',
+      };
+      return typeMap[frontendType] || 'GENERAL_CONSULTATION';
+    };
+
+    // Calculate end time based on start time and duration
+    const startTime = new Date(selectedSlot.startTime);
+    const endTime = new Date(
+      startTime.getTime() + selectedSlot.duration * 60000
+    ); // duration in minutes to milliseconds
+
     const appointmentData = {
       patientId: selectedPatient.id,
       slotId: selectedSlot.id,
-      appointmentType: appointmentType || 'CONSULTATION',
+      appointmentType: getBackendAppointmentType(
+        appointmentType || 'CONSULTATION'
+      ),
       priority: priority || 'ROUTINE',
       reason,
       symptoms,
       notes,
       requiresPrePayment,
+      scheduledStart: startTime.toISOString(),
+      scheduledEnd: endTime.toISOString(),
     };
 
     createAppointmentMutation.mutate(appointmentData);
@@ -387,7 +374,16 @@ const CreateAppointmentPage: React.FC = () => {
             {/* Provider Selection */}
             <Box mb={3}>
               <Typography variant='subtitle1' gutterBottom>
-                Provider *
+                Provider *{' '}
+                {selectedService && (
+                  <Typography
+                    component='span'
+                    variant='caption'
+                    color='text.secondary'
+                  >
+                    (Filtered by {selectedService.name})
+                  </Typography>
+                )}
               </Typography>
               {selectedProvider ? (
                 <Paper
@@ -395,11 +391,11 @@ const CreateAppointmentPage: React.FC = () => {
                 >
                   <Box>
                     <Typography variant='body1' fontWeight={500}>
-                      Dr. {selectedProvider.firstName}{' '}
-                      {selectedProvider.lastName}
+                      Dr. {selectedProvider.user.firstName}{' '}
+                      {selectedProvider.user.lastName}
                     </Typography>
                     <Typography variant='body2' color='text.secondary'>
-                      {selectedProvider.department || 'General Medicine'}
+                      {selectedProvider.department?.name || 'General Medicine'}
                     </Typography>
                   </Box>
                   <Button
@@ -411,13 +407,13 @@ const CreateAppointmentPage: React.FC = () => {
                   </Button>
                 </Paper>
               ) : (
-                <FormControl fullWidth>
+                <FormControl fullWidth disabled={!selectedService}>
                   <InputLabel>Select Provider</InputLabel>
                   <Select
                     value={selectedProvider?.id || ''}
                     onChange={(e) => {
                       const provider = providers?.data?.find(
-                        (p: any) => p.id === e.target.value
+                        (p: StaffMember) => p.id === e.target.value
                       );
                       if (provider) {
                         handleProviderSelect(provider);
@@ -426,10 +422,40 @@ const CreateAppointmentPage: React.FC = () => {
                     label='Select Provider'
                     displayEmpty
                   >
-                    {providers?.data?.map((provider: any) => (
+                    {!selectedService && (
+                      <MenuItem disabled>
+                        <Typography variant='body2' color='text.secondary'>
+                          Please select a service first
+                        </Typography>
+                      </MenuItem>
+                    )}
+                    {selectedService && providersLoading && (
+                      <MenuItem disabled>
+                        <Typography variant='body2' color='text.secondary'>
+                          Loading providers for {selectedService.name}...
+                        </Typography>
+                      </MenuItem>
+                    )}
+                    {selectedService && providersError && (
+                      <MenuItem disabled>
+                        <Typography variant='body2' color='error'>
+                          Error loading providers
+                        </Typography>
+                      </MenuItem>
+                    )}
+                    {selectedService &&
+                      providers?.data?.length === 0 &&
+                      !providersLoading && (
+                        <MenuItem disabled>
+                          <Typography variant='body2' color='text.secondary'>
+                            No providers available for {selectedService.name}
+                          </Typography>
+                        </MenuItem>
+                      )}
+                    {providers?.data?.map((provider: StaffMember) => (
                       <MenuItem key={provider.id} value={provider.id}>
-                        Dr. {provider.firstName} {provider.lastName} -{' '}
-                        {provider.department || 'General Medicine'}
+                        Dr. {provider.user.firstName} {provider.user.lastName} -{' '}
+                        {provider.department?.name || 'General Medicine'}
                       </MenuItem>
                     ))}
                   </Select>
@@ -437,129 +463,20 @@ const CreateAppointmentPage: React.FC = () => {
               )}
             </Box>
 
-            {/* Date Selection */}
-            <Box mb={3}>
-              <Typography variant='subtitle1' gutterBottom>
-                Appointment Date *
-              </Typography>
-
-              {/* Smart Date-Time Picker */}
-              <Box>
-                <TextField
-                  fullWidth
-                  label='Click to select appointment date and time'
-                  value={selectedDate ? selectedDate.toLocaleDateString() : ''}
-                  onClick={() => setShowDateTimePicker(true)}
-                  InputProps={{
-                    readOnly: true,
-                    endAdornment: (
-                      <IconButton onClick={() => setShowDateTimePicker(true)}>
-                        <CalendarToday />
-                      </IconButton>
-                    ),
-                  }}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </Box>
-
-              {/* Custom Calendar Dialog */}
-              <CustomCalendar
-                open={showDateTimePicker}
-                onClose={() => setShowDateTimePicker(false)}
-                selectedProvider={selectedProvider}
-                selectedDate={selectedDate}
-                onDateSelect={handleDateSelect}
-                onTimeSlotSelect={(slot: any) => setSelectedTimeSlot(slot)}
-                availabilityData={availabilityData}
-                loadingAvailability={loadingAvailability}
-                selectedTimeSlot={selectedTimeSlot}
-              />
-            </Box>
-
-            {/* Available Slots */}
+            {/* Appointment Calendar */}
             {selectedProvider && (
-              <Box>
-                <Box
-                  display='flex'
-                  justifyContent='space-between'
-                  alignItems='center'
-                  mb={2}
-                >
-                  <Typography variant='subtitle1'>
-                    Available Time Slots
-                  </Typography>
-                  <IconButton
-                    onClick={() => refetchSlots()}
-                    disabled={slotsLoading}
-                  >
-                    <CalendarToday />
-                  </IconButton>
-                </Box>
-
-                {slotsLoading ? (
-                  <Box display='flex' justifyContent='center' p={3}>
-                    <CircularProgress />
-                  </Box>
-                ) : availableSlots && availableSlots.length > 0 ? (
-                  <Box>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns:
-                          'repeat(auto-fill, minmax(250px, 1fr))',
-                        gap: 2,
-                      }}
-                    >
-                      {availableSlots.map((slot: any) => (
-                        <Paper
-                          key={slot.id}
-                          sx={{
-                            p: 2,
-                            cursor: 'pointer',
-                            border: selectedSlot?.id === slot.id ? 2 : 1,
-                            borderColor:
-                              selectedSlot?.id === slot.id
-                                ? 'primary.main'
-                                : 'divider',
-                            '&:hover': {
-                              borderColor: 'primary.main',
-                            },
-                          }}
-                          onClick={() => handleSlotSelect(slot)}
-                        >
-                          <Box textAlign='center'>
-                            <Typography variant='h6' color='primary'>
-                              {typeof slot.startTime === 'string'
-                                ? slot.startTime
-                                : slot.startTime.toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                            </Typography>
-                            <Typography variant='body2' color='text.secondary'>
-                              Duration: {slot.duration} min
-                            </Typography>
-                            <Chip
-                              label={
-                                slot.isAvailable ? 'Available' : 'Unavailable'
-                              }
-                              color={slot.isAvailable ? 'success' : 'error'}
-                              size='small'
-                              sx={{ mt: 1 }}
-                            />
-                          </Box>
-                        </Paper>
-                      ))}
-                    </Box>
-                  </Box>
-                ) : (
-                  <Alert severity='info'>
-                    No available slots found for the selected date and provider.
-                  </Alert>
-                )}
-              </Box>
+              <AppointmentCalendar
+                timeSlots={availableSlots || []}
+                selectedDate={
+                  selectedDate ? selectedDate.toISOString().split('T')[0] : null
+                }
+                onDateSelect={(dateString) => {
+                  setSelectedDate(new Date(dateString));
+                }}
+                onTimeSlotSelect={(timeSlot) => {
+                  handleSlotSelect(timeSlot as any);
+                }}
+              />
             )}
           </Box>
         );
@@ -701,8 +618,11 @@ const CreateAppointmentPage: React.FC = () => {
                     Provider
                   </Typography>
                   <Typography variant='body1' fontWeight={500}>
-                    Dr. {selectedProvider?.firstName}{' '}
-                    {selectedProvider?.lastName}
+                    Dr. {selectedProvider?.user.firstName}{' '}
+                    {selectedProvider?.user.lastName}
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    {selectedProvider?.department?.name || 'General Medicine'}
                   </Typography>
                 </Box>
 
@@ -711,12 +631,86 @@ const CreateAppointmentPage: React.FC = () => {
                     Date & Time
                   </Typography>
                   <Typography variant='body1' fontWeight={500}>
-                    {selectedDate?.toLocaleDateString()}
+                    {selectedDate?.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
                   </Typography>
                   <Typography variant='body2' color='text.secondary'>
-                    {selectedSlot?.startTime} ({selectedSlot?.duration} min)
+                    {selectedSlot &&
+                      new Date(selectedSlot.startTime).toLocaleTimeString(
+                        'en-US',
+                        {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true,
+                        }
+                      )}{' '}
+                    ({selectedSlot?.duration} minutes)
                   </Typography>
                 </Box>
+
+                <Box>
+                  <Typography variant='subtitle2' color='text.secondary'>
+                    Appointment Type
+                  </Typography>
+                  <Typography variant='body1' fontWeight={500}>
+                    {appointmentType || 'Not specified'}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant='subtitle2' color='text.secondary'>
+                    Priority
+                  </Typography>
+                  <Typography variant='body1' fontWeight={500}>
+                    {priority || 'Not specified'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+
+            {/* Additional Details */}
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant='h6' gutterBottom color='primary'>
+                📝 Additional Information
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {reason && (
+                  <Box>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Reason for Visit
+                    </Typography>
+                    <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap' }}>
+                      {reason}
+                    </Typography>
+                  </Box>
+                )}
+
+                {symptoms && (
+                  <Box>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Symptoms
+                    </Typography>
+                    <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap' }}>
+                      {symptoms}
+                    </Typography>
+                  </Box>
+                )}
+
+                {notes && (
+                  <Box>
+                    <Typography variant='subtitle2' color='text.secondary'>
+                      Additional Notes
+                    </Typography>
+                    <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap' }}>
+                      {notes}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </Paper>
 
@@ -725,6 +719,31 @@ const CreateAppointmentPage: React.FC = () => {
               appointment will be scheduled and notifications will be sent to
               the patient.
             </Alert>
+
+            {/* Submit Button */}
+            <Box display='flex' justifyContent='center' gap={2}>
+              <Button
+                variant='outlined'
+                onClick={() => setActiveStep(2)}
+                size='large'
+              >
+                Back to Edit
+              </Button>
+              <Button
+                variant='contained'
+                onClick={handleSubmitAppointment}
+                size='large'
+                disabled={
+                  !selectedPatient ||
+                  !selectedService ||
+                  !selectedProvider ||
+                  !selectedSlot
+                }
+                sx={{ minWidth: 200 }}
+              >
+                Confirm & Book Appointment
+              </Button>
+            </Box>
           </Box>
         );
 

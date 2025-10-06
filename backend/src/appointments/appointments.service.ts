@@ -115,54 +115,86 @@ export class AppointmentsService {
       finalAmount = await this.calculateAppointmentCost(createAppointmentDto);
     }
 
-    // Create appointment
-    const appointment = await this.prisma.appointment.create({
-      data: {
-        ...createAppointmentDto,
-        providerId: slot.providerId, // Add providerId from slot
-        totalAmount: finalAmount,
-        balance: finalAmount,
-        requiresPrePayment,
-        scheduledStart: new Date(scheduledStart),
-        scheduledEnd: new Date(scheduledEnd),
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            patientId: true,
-            phoneNumber: true,
-            email: true,
-          },
+    // Use transaction to ensure atomicity and prevent race conditions
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Re-validate slot availability within transaction to prevent race conditions
+      const currentSlot = await tx.appointmentSlot.findUnique({
+        where: { id: slotId },
+      });
+
+      if (!currentSlot) {
+        throw new NotFoundException('Appointment slot not found');
+      }
+
+      if (!currentSlot.isAvailable || !currentSlot.isBookable) {
+        throw new BadRequestException(
+          'Appointment slot is not available for booking',
+        );
+      }
+
+      if (currentSlot.currentBookings >= currentSlot.maxBookings) {
+        throw new BadRequestException('Appointment slot is fully booked');
+      }
+
+      // Create appointment
+      const appointment = await tx.appointment.create({
+        data: {
+          ...createAppointmentDto,
+          providerId: slot.providerId, // Add providerId from slot
+          totalAmount: finalAmount,
+          balance: finalAmount,
+          requiresPrePayment,
+          scheduledStart: new Date(scheduledStart),
+          scheduledEnd: new Date(scheduledEnd),
         },
-        slot: {
-          include: {
-            provider: {
-              include: {
-                user: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              patientId: true,
+              phoneNumber: true,
+              email: true,
+            },
+          },
+          slot: {
+            include: {
+              provider: {
+                include: {
+                  user: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                    },
                   },
                 },
               },
-            },
-            resource: {
-              select: {
-                id: true,
-                name: true,
-                type: true,
-                location: true,
+              resource: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                  location: true,
+                },
               },
             },
           },
         },
-      },
+      });
+
+      // Update slot booking count atomically
+      await tx.appointmentSlot.update({
+        where: { id: slotId },
+        data: { currentBookings: { increment: 1 } },
+      });
+
+      return appointment;
     });
 
-    // Create invoice for the appointment
+    const appointment = result;
+
+    // Create invoice for the appointment (outside transaction)
     await this.createAppointmentInvoice(appointment);
 
     // Send appointment confirmation notifications
@@ -182,12 +214,6 @@ export class AppointmentsService {
     // - 24-hour reminders processed every 15 minutes
     // - 2-hour reminders processed every 15 minutes
     // - 1-hour reminders processed every 15 minutes
-
-    // Update slot booking count
-    await this.prisma.appointmentSlot.update({
-      where: { id: slotId },
-      data: { currentBookings: { increment: 1 } },
-    });
 
     // Create initial notification
     await this.createAppointmentNotification(
@@ -613,7 +639,7 @@ export class AppointmentsService {
       end,
     );
 
-    // Get available slots
+    // Get available slots - we'll filter by booking capacity after fetching
     const availableSlots = await this.prisma.appointmentSlot.findMany({
       where: {
         providerId,
@@ -622,7 +648,6 @@ export class AppointmentsService {
         specialty: specialty || undefined,
         isAvailable: true,
         isBookable: true,
-        currentBookings: { lt: this.prisma.appointmentSlot.fields.maxBookings },
       },
       include: {
         provider: {
@@ -646,10 +671,15 @@ export class AppointmentsService {
       orderBy: { startTime: 'asc' },
     });
 
+    // Filter by booking capacity - only show slots that have available capacity
+    const slotsWithCapacity = availableSlots.filter(
+      (slot) => slot.currentBookings < slot.maxBookings,
+    );
+
     // Filter by duration if specified
-    let filteredSlots = availableSlots;
+    let filteredSlots = slotsWithCapacity;
     if (duration) {
-      filteredSlots = availableSlots.filter(
+      filteredSlots = slotsWithCapacity.filter(
         (slot) => slot.duration >= duration,
       );
     }
@@ -977,7 +1007,17 @@ export class AppointmentsService {
 
     while (currentDate <= end) {
       const dateString = currentDate.toISOString().split('T')[0];
-      const dayOfWeek = currentDate.getDay();
+      const dayOfWeekNum = currentDate.getDay();
+      const dayNames = [
+        'SUNDAY',
+        'MONDAY',
+        'TUESDAY',
+        'WEDNESDAY',
+        'THURSDAY',
+        'FRIDAY',
+        'SATURDAY',
+      ];
+      const dayOfWeek = dayNames[dayOfWeekNum];
       const isPast = currentDate < today;
       const isToday = currentDate.toDateString() === today.toDateString();
 
@@ -1005,7 +1045,7 @@ export class AppointmentsService {
 
       // Determine availability
       const isAvailable =
-        daySchedule?.isAvailable &&
+        daySchedule?.isWorking &&
         dayTimeOff.length === 0 &&
         daySlots.length > 0;
 
@@ -1013,9 +1053,9 @@ export class AppointmentsService {
       const timeSlots = this.generateTimeSlots(
         daySchedule?.startTime || '09:00',
         daySchedule?.endTime || '17:00',
-        daySchedule?.slotDuration || 30,
-        daySchedule?.breakStart || undefined,
-        daySchedule?.breakEnd || undefined,
+        30, // Default slot duration
+        daySchedule?.breakStartTime || undefined,
+        daySchedule?.breakEndTime || undefined,
         daySlots,
         [],
       );
@@ -1038,11 +1078,11 @@ export class AppointmentsService {
         isToday,
         startTime: daySchedule?.startTime || '09:00',
         endTime: daySchedule?.endTime || '17:00',
-        breakStart: daySchedule?.breakStart || undefined,
-        breakEnd: daySchedule?.breakEnd || undefined,
-        maxAppointments: daySchedule?.maxAppointments || 8,
-        slotDuration: daySchedule?.slotDuration || 30,
-        bufferTime: daySchedule?.bufferTime || 15,
+        breakStart: daySchedule?.breakStartTime || undefined,
+        breakEnd: daySchedule?.breakEndTime || undefined,
+        maxAppointments: daySchedule?.maxAppointmentsPerHour || 2,
+        slotDuration: 30, // Default slot duration
+        bufferTime: 15, // Default buffer time
         availableSlots: daySlots as any,
         bookedSlots: [],
         timeOff: dayTimeOff,
@@ -1472,6 +1512,137 @@ export class AppointmentsService {
     return templates[notificationType] || 'Appointment notification';
   }
 
+  // ===== SERVICE PROVIDER VALIDATION =====
+
+  async validateServiceProviderAccess(
+    providerId: string,
+    serviceId: string,
+  ): Promise<boolean> {
+    // Get provider details
+    const provider = await this.prisma.staffMember.findUnique({
+      where: { id: providerId },
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.serviceProvider) {
+      throw new BadRequestException(
+        'Staff member is not authorized to provide services',
+      );
+    }
+
+    if (!provider.isActive) {
+      throw new BadRequestException('Provider is not active');
+    }
+
+    // Get service details
+    const service = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service not found');
+    }
+
+    if (!service.isActive) {
+      throw new BadRequestException('Service is not active');
+    }
+
+    // Check if provider's department matches service's department
+    if (
+      service.departmentId &&
+      provider.departmentId !== service.departmentId
+    ) {
+      throw new BadRequestException(
+        `Provider from ${provider.department?.name || 'Unknown Department'} cannot provide services from ${service.department?.name || 'Unknown Department'}`,
+      );
+    }
+
+    return true;
+  }
+
+  async getProviderServices(providerId: string): Promise<any[]> {
+    // Get provider details
+    const provider = await this.prisma.staffMember.findUnique({
+      where: { id: providerId },
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.serviceProvider) {
+      throw new BadRequestException(
+        'Staff member is not authorized to provide services',
+      );
+    }
+
+    if (!provider.isActive) {
+      throw new BadRequestException('Provider is not active');
+    }
+
+    // Get services available to this provider's department
+    const whereClause: any = {
+      isActive: true,
+    };
+
+    if (provider.departmentId) {
+      whereClause.departmentId = provider.departmentId;
+    }
+
+    const services = await this.prisma.service.findMany({
+      where: whereClause,
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+    });
+
+    return services;
+  }
+
   // ===== HELPER METHODS =====
 
   private mapToAppointmentResponse(appointment: any): AppointmentResponse {
@@ -1517,12 +1688,21 @@ export class AppointmentsService {
     });
   }
 
-  private getDaysOfWeekRange(start: Date, end: Date): number[] {
-    const days: number[] = [];
+  private getDaysOfWeekRange(start: Date, end: Date): string[] {
+    const days: string[] = [];
     const current = new Date(start);
+    const dayNames = [
+      'SUNDAY',
+      'MONDAY',
+      'TUESDAY',
+      'WEDNESDAY',
+      'THURSDAY',
+      'FRIDAY',
+      'SATURDAY',
+    ];
 
     while (current <= end) {
-      days.push(current.getDay());
+      days.push(dayNames[current.getDay()]);
       current.setDate(current.getDate() + 1);
     }
 

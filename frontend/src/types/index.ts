@@ -113,14 +113,14 @@ export interface Appointment {
   patientId: string;
   patient?: Patient;
   patientName?: string;
-  serviceId: string;
+  serviceId?: string;
   service?: Service;
   serviceName?: string;
-  providerId: string;
+  providerId?: string;
   provider?: User;
   providerName?: string;
-  appointmentDate: string;
-  appointmentTime: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
   date?: string;
   time?: string;
   duration?: number;
@@ -132,6 +132,7 @@ export interface Appointment {
 
   // Enhanced appointment fields
   slotId?: string;
+  slot?: AppointmentSlot;
   appointmentType?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
@@ -194,16 +195,34 @@ export type AppointmentPriority =
 export interface AppointmentSlot {
   id: string;
   providerId: string;
-  provider?: User;
-  date: string;
+  provider?: {
+    id: string;
+    userId: string;
+    employeeId: string;
+    departmentId?: string;
+    specialization?: string;
+    licenseNumber?: string;
+    serviceProvider: boolean;
+    hireDate: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+    user: {
+      firstName: string;
+      lastName: string;
+    };
+  };
+  date?: string;
   startTime: string;
   endTime: string;
   duration: number;
   isAvailable: boolean;
-  maxAppointments: number;
-  currentAppointments: number;
+  maxAppointments?: number;
+  currentAppointments?: number;
+  currentBookings?: number;
+  maxBookings?: number;
   slotType: string;
-  isRecurring: boolean;
+  isRecurring?: boolean;
   recurringPattern?: string;
   isActive: boolean;
   createdAt: string;
@@ -236,14 +255,21 @@ export interface AppointmentSearchResult {
 export interface ProviderSchedule {
   id: string;
   providerId: string;
-  provider?: User;
-  dayOfWeek: number;
+  provider?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    specialization?: string;
+    department: string;
+  };
+  dayOfWeek: string;
   startTime: string;
   endTime: string;
-  isActive: boolean;
-  maxAppointments: number;
+  isWorking: boolean;
+  maxAppointmentsPerHour: number;
   breakStartTime?: string;
   breakEndTime?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

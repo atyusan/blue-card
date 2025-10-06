@@ -94,7 +94,7 @@ export class PermissionAnalyticsService {
           select: { permissions: true },
         },
         staffMember: {
-          select: { departmentRef: { select: { name: true } } },
+          select: { department: { select: { name: true } } },
         },
       },
     });
@@ -128,9 +128,9 @@ export class PermissionAnalyticsService {
         }
         permissionUsage[permission].totalUsage++;
         permissionUsage[permission].roleBased++;
-        if (assignment.staffMember.departmentRef?.name) {
+        if (assignment.staffMember.department?.name) {
           permissionUsage[permission].departments.add(
-            assignment.staffMember.departmentRef.name,
+            assignment.staffMember.department.name,
           );
         }
       });

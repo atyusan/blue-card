@@ -6,7 +6,6 @@ import {
   IsNumber,
   IsBoolean,
   IsArray,
-  IsUUID,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import {

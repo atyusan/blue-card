@@ -38,6 +38,8 @@ import {
   ExpandLess,
   ExpandMore,
   AccountCircle,
+  Schedule,
+  EventBusy,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -77,6 +79,18 @@ const navigationItems = [
         href: '/appointments',
         icon: CalendarToday,
         permission: 'view_appointments',
+      },
+      {
+        title: 'My Availability',
+        href: '/provider/availability',
+        icon: Schedule,
+        permission: 'view_appointments',
+      },
+      {
+        title: 'Time Off Management',
+        href: '/timeoff-management',
+        icon: EventBusy,
+        permission: 'admin',
       },
     ],
   },

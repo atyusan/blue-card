@@ -133,20 +133,6 @@ export class StaffController {
     return this.staffService.getStaffStats();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get staff member by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Staff member found',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Staff member not found',
-  })
-  findOne(@Param('id') id: string) {
-    return this.staffService.findById(id);
-  }
-
   @Get('employee/:employeeId')
   @ApiOperation({ summary: 'Get staff member by employee ID' })
   @ApiResponse({
@@ -270,5 +256,138 @@ export class StaffController {
   })
   getStaffStats(@Param('id') id: string) {
     return this.staffService.getStaffMemberStats(id);
+  }
+
+  // ===== SERVICE PROVIDER ENDPOINTS =====
+
+  @Get('service-providers')
+  @ApiOperation({ summary: 'Get all service providers' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all service providers with pagination and filtering',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name, employee ID, or department',
+  })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Filter by department ID',
+  })
+  @ApiQuery({
+    name: 'specialization',
+    required: false,
+    description: 'Filter by specialization',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    description: 'Filter by active status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page (default: 20)',
+    example: 20,
+  })
+  getServiceProviders(
+    @Query('search') search?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('specialization') specialization?: string,
+    @Query('isActive', new ParseBoolPipe({ optional: true }))
+    isActive?: boolean,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.staffService.findServiceProviders({
+      search,
+      departmentId,
+      specialization,
+      isActive,
+      page,
+      limit,
+    });
+  }
+
+  @Get('service-providers/stats')
+  @ApiOperation({ summary: 'Get service provider statistics' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Service provider statistics including counts by department and specialization',
+  })
+  getServiceProviderStats() {
+    return this.staffService.getServiceProviderStats();
+  }
+
+  @Get('service-providers/department/:departmentId')
+  @ApiOperation({ summary: 'Get service providers by department' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of service providers in the specified department',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Department not found',
+  })
+  getServiceProvidersByDepartment(@Param('departmentId') departmentId: string) {
+    return this.staffService.findServiceProvidersByDepartment(departmentId);
+  }
+
+  @Get('service-providers/specialization/:specialization')
+  @ApiOperation({ summary: 'Get service providers by specialization' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of service providers with the specified specialization',
+  })
+  getServiceProvidersBySpecialization(
+    @Param('specialization') specialization: string,
+  ) {
+    return this.staffService.findServiceProvidersBySpecialization(
+      specialization,
+    );
+  }
+
+  @Patch(':id/service-provider-status')
+  @ApiOperation({ summary: 'Update service provider status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service provider status updated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Staff member not found',
+  })
+  updateServiceProviderStatus(
+    @Param('id') id: string,
+    @Body() body: { serviceProvider: boolean },
+  ) {
+    return this.staffService.updateServiceProviderStatus(
+      id,
+      body.serviceProvider,
+    );
+  }
+
+  // This route must be LAST to avoid conflicts with specific routes above
+  @Get(':id')
+  @ApiOperation({ summary: 'Get staff member by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Staff member found',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Staff member not found',
+  })
+  findOne(@Param('id') id: string) {
+    return this.staffService.findById(id);
   }
 }

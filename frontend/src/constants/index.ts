@@ -345,6 +345,20 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
         path: '/appointments/waitlist',
         permission: [UserRole.ADMIN, UserRole.RECEPTIONIST],
       },
+      {
+        id: 'provider-availability',
+        label: 'My Availability',
+        icon: 'Schedule',
+        path: '/provider/availability',
+        permission: [UserRole.DOCTOR, UserRole.NURSE],
+      },
+      {
+        id: 'timeoff-management',
+        label: 'Time Off Management',
+        icon: 'EventBusy',
+        path: '/timeoff-management',
+        permission: [UserRole.ADMIN],
+      },
     ],
   },
   {

@@ -88,20 +88,20 @@ model StaffRoleAssignment {
 }
 
 model StaffMember {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  employeeId     String   @unique
-  departmentId   String? // Changed from department string to foreign key
-  department     String // Keep for backward compatibility during migration
-  specialization String?
-  licenseNumber  String?
-  hireDate       DateTime
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  employeeId      String   @unique
+  departmentId    String? // Changed from department string to foreign key
+  specialization  String?
+  licenseNumber   String?
+  serviceProvider Boolean  @default(false) // Indicates if staff member can provide services
+  hireDate        DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relations
-  departmentRef               Department?           @relation(fields: [departmentId], references: [id])
+  department                  Department?           @relation(fields: [departmentId], references: [id])
   roleAssignments             StaffRoleAssignment[]
   roleAssignmentsGiven        StaffRoleAssignment[] @relation("RoleAssignments")
   temporaryPermissionsGranted TemporaryPermission[]
@@ -958,20 +958,18 @@ model AppointmentNotification {
 }
 
 model ProviderSchedule {
-  id              String   @id @default(cuid())
-  providerId      String
-  dayOfWeek       Int // 0-6 (Sunday-Saturday)
-  startTime       String // HH:MM format
-  endTime         String // HH:MM format
-  breakStart      String? // HH:MM format
-  breakEnd        String? // HH:MM format
-  isAvailable     Boolean  @default(true)
-  maxAppointments Int      @default(20)
-  slotDuration    Int      @default(30) // Minutes
-  bufferTime      Int      @default(5) // Minutes between appointments
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  providerId             String
+  dayOfWeek              String // MONDAY, TUESDAY, etc.
+  startTime              String // HH:MM format
+  endTime                String // HH:MM format
+  breakStartTime         String? // HH:MM format (renamed from breakStart)
+  breakEndTime           String? // HH:MM format (renamed from breakEnd)
+  isWorking              Boolean  @default(true) // renamed from isAvailable
+  maxAppointmentsPerHour Int      @default(2) // renamed from maxAppointments, reduced default
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   // Relations
   provider StaffMember @relation("ProviderSchedules", fields: [providerId], references: [id])

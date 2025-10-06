@@ -51,6 +51,7 @@ import {
   AccountBalance,
   ManageAccounts,
   RequestQuote,
+  Schedule,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { NAVIGATION_ITEMS } from '../../constants';
@@ -249,6 +250,7 @@ const Layout: React.FC = () => {
       ManageAccounts: <ManageAccounts />,
       Notifications: <Notifications />,
       RequestQuote: <RequestQuote />,
+      Schedule: <Schedule />,
     };
     return iconMap[iconName] || <Dashboard />;
   };

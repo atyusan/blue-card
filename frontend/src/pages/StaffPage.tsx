@@ -90,11 +90,11 @@ export const StaffPage: React.FC = () => {
     lastName: '',
     employeeId: '',
     departmentId: '',
-    department: '',
     specialization: '',
     licenseNumber: '',
     hireDate: '',
     isActive: true,
+    serviceProvider: false,
   });
 
   // Query for staff data
@@ -224,7 +224,6 @@ export const StaffPage: React.FC = () => {
       lastName: '',
       employeeId: '',
       departmentId: '',
-      department: '',
       specialization: '',
       licenseNumber: '',
       hireDate: '',
@@ -242,11 +241,11 @@ export const StaffPage: React.FC = () => {
       lastName: staffMember.user.lastName,
       employeeId: staffMember.employeeId,
       departmentId: staffMember.departmentId || '',
-      department: staffMember.department,
       specialization: staffMember.specialization || '',
       licenseNumber: staffMember.licenseNumber || '',
       hireDate: staffMember.hireDate.split('T')[0], // Format for date input
       isActive: staffMember.isActive,
+      serviceProvider: staffMember.serviceProvider || false,
     });
     setDialogOpen(true);
   };
@@ -260,11 +259,11 @@ export const StaffPage: React.FC = () => {
       lastName: staffMember.user.lastName,
       employeeId: staffMember.employeeId,
       departmentId: staffMember.departmentId || '',
-      department: staffMember.department,
       specialization: staffMember.specialization || '',
       licenseNumber: staffMember.licenseNumber || '',
       hireDate: staffMember.hireDate.split('T')[0],
       isActive: staffMember.isActive,
+      serviceProvider: staffMember.serviceProvider || false,
     });
     setDialogOpen(true);
   };
@@ -809,6 +808,7 @@ export const StaffPage: React.FC = () => {
                 <TableCell>Specialization</TableCell>
                 <TableCell>Hire Date</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell align='right'>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -847,7 +847,7 @@ export const StaffPage: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={staffMember.department}
+                      label={staffMember.department?.name || 'No Department'}
                       size='small'
                       color='secondary'
                       variant='outlined'
@@ -868,6 +868,20 @@ export const StaffPage: React.FC = () => {
                       label={staffMember.isActive ? 'Active' : 'Inactive'}
                       color={staffMember.isActive ? 'success' : 'default'}
                       size='small'
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={
+                        staffMember.serviceProvider
+                          ? 'Service Provider'
+                          : 'Staff'
+                      }
+                      color={staffMember.serviceProvider ? 'info' : 'default'}
+                      size='small'
+                      variant={
+                        staffMember.serviceProvider ? 'filled' : 'outlined'
+                      }
                     />
                   </TableCell>
                   <TableCell align='right'>
@@ -1269,7 +1283,9 @@ export const StaffPage: React.FC = () => {
                           Department
                         </Typography>
                         <Chip
-                          label={staffForm.department}
+                          label={
+                            selectedStaff?.department?.name || 'No Department'
+                          }
                           color='secondary'
                           variant='outlined'
                           sx={{ fontWeight: 600 }}
@@ -1469,6 +1485,30 @@ export const StaffPage: React.FC = () => {
                           </Typography>
                         </Box>
                       </Box>
+                      <Box>
+                        <Typography
+                          variant='subtitle2'
+                          color='text.secondary'
+                          gutterBottom
+                          sx={{ fontWeight: 600 }}
+                        >
+                          Service Provider Status
+                        </Typography>
+                        <Chip
+                          label={
+                            selectedStaff?.serviceProvider
+                              ? 'Service Provider'
+                              : 'Non-Service Provider'
+                          }
+                          color={
+                            selectedStaff?.serviceProvider
+                              ? 'primary'
+                              : 'default'
+                          }
+                          variant='filled'
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
                     </Box>
                   </CardContent>
                 </Card>
@@ -1589,13 +1629,9 @@ export const StaffPage: React.FC = () => {
                       <Select
                         value={staffForm.departmentId || ''}
                         onChange={(e) => {
-                          const selectedDept = departmentsData?.data.find(
-                            (dept) => dept.id === e.target.value
-                          );
                           setStaffForm({
                             ...staffForm,
                             departmentId: e.target.value,
-                            department: selectedDept?.name || '',
                           });
                         }}
                         label='Department'
@@ -1730,6 +1766,32 @@ export const StaffPage: React.FC = () => {
                           {staffForm.isActive
                             ? 'Staff member can access the system'
                             : 'Staff member is inactive and cannot access the system'}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={staffForm.serviceProvider || false}
+                        onChange={(e) =>
+                          setStaffForm({
+                            ...staffForm,
+                            serviceProvider: e.target.checked,
+                          })
+                        }
+                        color='primary'
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant='body2' sx={{ fontWeight: 500 }}>
+                          Service Provider
+                        </Typography>
+                        <Typography variant='caption' color='text.secondary'>
+                          {staffForm.serviceProvider
+                            ? 'Staff member can provide services to patients and be selected for appointments'
+                            : 'Staff member cannot provide services or be selected for appointments'}
                         </Typography>
                       </Box>
                     }

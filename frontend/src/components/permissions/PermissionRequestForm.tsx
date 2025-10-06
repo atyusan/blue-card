@@ -209,7 +209,7 @@ export const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({
               <div>
                 <span className='text-muted-foreground'>Department:</span>
                 <span className='ml-2 font-medium'>
-                  {staffMember?.departmentRef?.name || 'Not assigned'}
+                  {staffMember?.department?.name || 'Not assigned'}
                 </span>
               </div>
               <div>
@@ -338,7 +338,8 @@ export const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({
                   <div className='flex-1'>
                     <span className='font-medium'>{approver.name}</span>
                     <span className='text-sm text-muted-foreground ml-2'>
-                      {approver.role} • {approver.department}
+                      {approver.role} •{' '}
+                      {approver.department?.name || 'No Department'}
                     </span>
                   </div>
                 </label>

@@ -13,12 +13,10 @@ export class ProviderSchedulesService {
         dayOfWeek: data.dayOfWeek,
         startTime: data.startTime,
         endTime: data.endTime,
-        breakStart: data.breakStart || null,
-        breakEnd: data.breakEnd || null,
-        isAvailable: data.isAvailable ?? true,
-        maxAppointments: data.maxAppointments ?? 20,
-        slotDuration: data.slotDuration ?? 30,
-        bufferTime: data.bufferTime ?? 5,
+        breakStartTime: data.breakStartTime || null,
+        breakEndTime: data.breakEndTime || null,
+        isWorking: data.isWorking ?? true,
+        maxAppointmentsPerHour: data.maxAppointmentsPerHour ?? 2,
         notes: data.notes || null,
       },
       include: {
@@ -43,14 +41,14 @@ export class ProviderSchedulesService {
       limit = 50,
       providerId,
       dayOfWeek,
-      isAvailable,
+      isWorking,
     } = query || {};
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (providerId) where.providerId = providerId;
     if (dayOfWeek !== undefined) where.dayOfWeek = dayOfWeek;
-    if (isAvailable !== undefined) where.isAvailable = isAvailable;
+    if (isWorking !== undefined) where.isWorking = isWorking;
 
     const total = await this.prisma.providerSchedule.count({ where });
     const schedules = await this.prisma.providerSchedule.findMany({
@@ -97,18 +95,18 @@ export class ProviderSchedulesService {
         ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
         ...(data.startTime !== undefined && { startTime: data.startTime }),
         ...(data.endTime !== undefined && { endTime: data.endTime }),
-        ...(data.breakStart !== undefined && { breakStart: data.breakStart }),
-        ...(data.breakEnd !== undefined && { breakEnd: data.breakEnd }),
-        ...(data.isAvailable !== undefined && {
-          isAvailable: data.isAvailable,
+        ...(data.breakStartTime !== undefined && {
+          breakStartTime: data.breakStartTime,
         }),
-        ...(data.maxAppointments !== undefined && {
-          maxAppointments: data.maxAppointments,
+        ...(data.breakEndTime !== undefined && {
+          breakEndTime: data.breakEndTime,
         }),
-        ...(data.slotDuration !== undefined && {
-          slotDuration: data.slotDuration,
+        ...(data.isWorking !== undefined && {
+          isWorking: data.isWorking,
         }),
-        ...(data.bufferTime !== undefined && { bufferTime: data.bufferTime }),
+        ...(data.maxAppointmentsPerHour !== undefined && {
+          maxAppointmentsPerHour: data.maxAppointmentsPerHour,
+        }),
         ...(data.notes !== undefined && { notes: data.notes }),
       },
       include: {
@@ -133,12 +131,10 @@ export class ProviderSchedulesService {
       dayOfWeek: s.dayOfWeek,
       startTime: s.startTime,
       endTime: s.endTime,
-      breakStart: s.breakStart || undefined,
-      breakEnd: s.breakEnd || undefined,
-      isAvailable: s.isAvailable,
-      maxAppointments: s.maxAppointments,
-      slotDuration: s.slotDuration,
-      bufferTime: s.bufferTime,
+      breakStartTime: s.breakStartTime || undefined,
+      breakEndTime: s.breakEndTime || undefined,
+      isWorking: s.isWorking,
+      maxAppointmentsPerHour: s.maxAppointmentsPerHour,
       notes: s.notes || undefined,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,

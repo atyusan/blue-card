@@ -127,7 +127,7 @@ export interface ProviderDateRangeAvailabilityResponse {
 
 export interface DateAvailability {
   date: string;
-  dayOfWeek: number;
+  dayOfWeek: string;
   isAvailable: boolean;
   isPast: boolean;
   isToday: boolean;
@@ -332,15 +332,13 @@ export interface RecurringSlotPatternResponse {
 export interface ProviderScheduleResponse {
   id: string;
   providerId: string;
-  dayOfWeek: number;
+  dayOfWeek: string;
   startTime: string;
   endTime: string;
-  breakStart?: string;
-  breakEnd?: string;
-  isAvailable: boolean;
-  maxAppointments: number;
-  slotDuration: number;
-  bufferTime: number;
+  breakStartTime?: string;
+  breakEndTime?: string;
+  isWorking: boolean;
+  maxAppointmentsPerHour: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;

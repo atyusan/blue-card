@@ -142,8 +142,7 @@ export class CashReportsService {
     const departmentStats = await this.calculateDepartmentStats(whereClause);
 
     // Calculate payment method statistics
-    const paymentMethodStats =
-      await this.calculatePaymentMethodStats(whereClause);
+    const paymentMethodStats = this.calculatePaymentMethodStats(whereClause);
 
     // Calculate time-based statistics
     const dailyStats = await this.calculateDailyStats(whereClause);
@@ -218,7 +217,7 @@ export class CashReportsService {
       .reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
 
     const departmentInvoiceStats =
-      await this.calculateInvoiceDepartmentStats(invoiceWhereClause);
+      this.calculateInvoiceDepartmentStats(invoiceWhereClause);
 
     return {
       totalInvoices,
@@ -286,7 +285,7 @@ export class CashReportsService {
     const netAmount = totalAmount - totalRefunds;
 
     const paymentMethodStats =
-      await this.calculatePaymentMethodStats(paymentWhereClause);
+      this.calculatePaymentMethodStats(paymentWhereClause);
 
     return {
       totalPayments,
@@ -361,6 +360,7 @@ export class CashReportsService {
         cashier: {
           include: {
             user: true,
+            department: true,
           },
         },
       },
@@ -370,7 +370,7 @@ export class CashReportsService {
     const departmentMap = new Map<string, DepartmentStats>();
 
     transactions.forEach((t) => {
-      const department = t.cashier.department || 'Unknown';
+      const department = t.cashier.department?.name || 'Unknown';
       const amount = Number(t.amount);
 
       if (!departmentMap.has(department)) {
@@ -397,9 +397,7 @@ export class CashReportsService {
     return Array.from(departmentMap.values());
   }
 
-  private async calculatePaymentMethodStats(
-    whereClause: any,
-  ): Promise<PaymentMethodStats[]> {
+  private calculatePaymentMethodStats(whereClause: any): PaymentMethodStats[] {
     // Since CashTransaction doesn't have paymentMethod, we'll return a default structure
     // This can be enhanced later when we have payment method information
     return [
@@ -541,7 +539,7 @@ export class CashReportsService {
     );
   }
 
-  private async calculateInvoiceDepartmentStats(whereClause: any) {
+  private calculateInvoiceDepartmentStats(whereClause: any) {
     // Since Invoice doesn't have a department field, we'll return a default structure
     // This can be enhanced later when we have department information
     return [

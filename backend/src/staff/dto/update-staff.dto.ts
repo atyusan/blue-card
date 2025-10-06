@@ -23,15 +23,6 @@ export class UpdateStaffDto extends PartialType(CreateStaffDto) {
   departmentId?: string;
 
   @ApiProperty({
-    description: 'Department name (for backward compatibility)',
-    example: 'Cardiology',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  department?: string;
-
-  @ApiProperty({
     description: 'Staff member specialization',
     example: 'Cardiologist',
     required: false,
@@ -66,6 +57,15 @@ export class UpdateStaffDto extends PartialType(CreateStaffDto) {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the staff member can provide services',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  serviceProvider?: boolean;
 
   // User fields (for frontend compatibility, but not used in staff update)
   @ApiProperty({

@@ -32,6 +32,7 @@ import {
   CreateAppointmentDto,
   CreateAppointmentSlotDto,
   CreateRecurringSlotDto,
+  CreateProviderScheduleDto,
 } from './dto/create-appointment.dto';
 import {
   UpdateAppointmentDto,
@@ -43,6 +44,7 @@ import {
   UpdateAppointmentStatusDto,
   UpdateAppointmentPaymentDto,
   UpdateAppointmentSlotDto,
+  UpdateProviderScheduleDto,
 } from './dto/update-appointment.dto';
 import {
   QueryAppointmentDto,
@@ -65,6 +67,7 @@ import {
   AppointmentSlotResponse,
   SlotSearchResult,
   ProviderDateRangeAvailabilityResponse,
+  ProviderScheduleResponse,
 } from './interfaces/appointment.interface';
 
 @ApiTags('Appointments')
@@ -572,31 +575,66 @@ export class AppointmentsController {
 
   @Post('providers/schedules')
   @HttpCode(HttpStatus.CREATED)
-  async createProviderSchedule(@Body() createScheduleDto: any): Promise<any> {
+  @ApiOperation({ summary: 'Create provider schedule' })
+  @ApiResponse({
+    status: 201,
+    description: 'Provider schedule created successfully',
+  })
+  async createProviderSchedule(
+    @Body() createScheduleDto: CreateProviderScheduleDto,
+  ): Promise<ProviderScheduleResponse> {
     return this.providerSchedulesService.create(createScheduleDto);
   }
 
   @Get('providers/schedules')
+  @ApiOperation({ summary: 'Get all provider schedules' })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider schedules retrieved successfully',
+  })
   async findAllProviderSchedules(
     @Query() queryDto: QueryProviderScheduleDto,
-  ): Promise<any> {
+  ): Promise<{
+    schedules: ProviderScheduleResponse[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     return this.providerSchedulesService.findAll(queryDto);
   }
 
   @Get('providers/schedules/:id')
-  async findOneProviderSchedule(@Param('id') id: string): Promise<any> {
+  @ApiOperation({ summary: 'Get provider schedule by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider schedule retrieved successfully',
+  })
+  async findOneProviderSchedule(
+    @Param('id') id: string,
+  ): Promise<ProviderScheduleResponse> {
     return this.providerSchedulesService.findOne(id);
   }
 
   @Patch('providers/schedules/:id')
+  @ApiOperation({ summary: 'Update provider schedule' })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider schedule updated successfully',
+  })
   async updateProviderSchedule(
     @Param('id') id: string,
-    @Body() updateScheduleDto: any,
-  ): Promise<any> {
+    @Body() updateScheduleDto: UpdateProviderScheduleDto,
+  ): Promise<ProviderScheduleResponse> {
     return this.providerSchedulesService.update(id, updateScheduleDto);
   }
 
   @Delete('providers/schedules/:id')
+  @ApiOperation({ summary: 'Delete provider schedule' })
+  @ApiResponse({
+    status: 204,
+    description: 'Provider schedule deleted successfully',
+  })
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeProviderSchedule(@Param('id') id: string): Promise<void> {
     await this.providerSchedulesService.remove(id);
@@ -632,6 +670,32 @@ export class AppointmentsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeProviderTimeOff(@Param('id') id: string): Promise<void> {
     await this.providerTimeOffService.remove(id);
+  }
+
+  @Post('providers/time-off/:id/approve')
+  @ApiOperation({ summary: 'Approve time off request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Time off request approved successfully',
+  })
+  async approveProviderTimeOff(
+    @Param('id') id: string,
+    @Body() body: { approvedBy: string; notes?: string },
+  ): Promise<any> {
+    return this.providerTimeOffService.approve(id, body.approvedBy, body.notes);
+  }
+
+  @Post('providers/time-off/:id/reject')
+  @ApiOperation({ summary: 'Reject time off request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Time off request rejected successfully',
+  })
+  async rejectProviderTimeOff(
+    @Param('id') id: string,
+    @Body() body: { approvedBy: string; notes?: string },
+  ): Promise<any> {
+    return this.providerTimeOffService.reject(id, body.approvedBy, body.notes);
   }
 
   // ===== RESOURCE MANAGEMENT =====
@@ -703,6 +767,64 @@ export class AppointmentsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeResourceSchedule(@Param('id') id: string): Promise<void> {
     await this.resourcesService.removeResourceSchedule(id);
+  }
+
+  // ===== SERVICE PROVIDER MANAGEMENT =====
+
+  @Get('providers/:providerId/services')
+  @ApiOperation({
+    summary: 'Get services available to a provider',
+    description:
+      'Retrieves all services that a specific provider can offer based on their department',
+  })
+  @ApiParam({ name: 'providerId', description: 'Provider ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Services available to provider retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Provider not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Provider is not authorized to provide services',
+  })
+  async getProviderServices(
+    @Param('providerId') providerId: string,
+  ): Promise<any[]> {
+    return await this.appointmentsService.getProviderServices(providerId);
+  }
+
+  @Post('providers/:providerId/services/:serviceId/validate')
+  @ApiOperation({
+    summary: 'Validate provider access to service',
+    description:
+      'Validates that a provider can offer a specific service based on department constraints',
+  })
+  @ApiParam({ name: 'providerId', description: 'Provider ID' })
+  @ApiParam({ name: 'serviceId', description: 'Service ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider access validated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Provider or service not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Provider cannot access this service',
+  })
+  async validateProviderServiceAccess(
+    @Param('providerId') providerId: string,
+    @Param('serviceId') serviceId: string,
+  ): Promise<{ valid: boolean; message: string }> {
+    await this.appointmentsService.validateServiceProviderAccess(
+      providerId,
+      serviceId,
+    );
+    return { valid: true, message: 'Provider can access this service' };
   }
 
   // ===== APPOINTMENT MANAGEMENT =====

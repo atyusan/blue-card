@@ -201,7 +201,8 @@ class AuthService {
     const user = this.getStoredUser();
     if (!user) return false;
 
-    // Define role-based permissions
+    // NOTE: These are fallback permissions. Real permissions come from the backend via AuthContext.
+    // This is kept for backward compatibility but should not be relied upon for new features.
     const permissions: Record<string, string[]> = {
       ADMIN: ['*'], // Admin has all permissions
       DOCTOR: [
@@ -209,14 +210,40 @@ class AuthService {
         'edit_patients',
         'view_appointments',
         'edit_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'manage_appointment_slots',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_billing',
       ],
-      NURSE: ['view_patients', 'view_appointments', 'view_billing'],
+      NURSE: [
+        'view_patients',
+        'view_appointments',
+        'update_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'view_appointment_slots',
+        'view_billing',
+      ],
       RECEPTIONIST: [
         'view_patients',
         'edit_patients',
         'view_appointments',
         'edit_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'view_provider_availability',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_billing',
         'edit_billing',
       ],
@@ -244,6 +271,7 @@ class AuthService {
     const user = this.getStoredUser();
     if (!user) return [];
 
+    // NOTE: These are fallback permissions. Real permissions come from the backend via AuthContext.
     const permissions: Record<string, string[]> = {
       ADMIN: ['*'],
       DOCTOR: [
@@ -251,14 +279,40 @@ class AuthService {
         'edit_patients',
         'view_appointments',
         'edit_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'manage_appointment_slots',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_billing',
       ],
-      NURSE: ['view_patients', 'view_appointments', 'view_billing'],
+      NURSE: [
+        'view_patients',
+        'view_appointments',
+        'update_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'view_appointment_slots',
+        'view_billing',
+      ],
       RECEPTIONIST: [
         'view_patients',
         'edit_patients',
         'view_appointments',
         'edit_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'view_provider_availability',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_billing',
         'edit_billing',
       ],

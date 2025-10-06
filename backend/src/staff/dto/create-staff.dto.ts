@@ -51,14 +51,6 @@ export class CreateStaffDto {
   departmentId?: string;
 
   @ApiProperty({
-    description: 'Department name (for backward compatibility)',
-    example: 'Cardiology',
-  })
-  @IsString()
-  @IsNotEmpty()
-  department: string;
-
-  @ApiProperty({
     description: 'Staff member specialization',
     example: 'Cardiologist',
     required: false,
@@ -93,4 +85,14 @@ export class CreateStaffDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the staff member can provide services',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  serviceProvider?: boolean;
 }

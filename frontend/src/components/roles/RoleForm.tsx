@@ -59,6 +59,20 @@ const PERMISSION_GROUPS = {
     'edit_appointments',
     'create_appointments',
     'delete_appointments',
+    'cancel_appointments',
+    'reschedule_appointments',
+    'manage_appointment_waitlist',
+  ],
+  'Provider Availability': [
+    'manage_provider_availability',
+    'view_provider_availability',
+    'manage_provider_schedules',
+    'manage_provider_time_off',
+  ],
+  'Appointment Slots': [
+    'manage_appointment_slots',
+    'view_appointment_slots',
+    'delete_appointment_slots',
   ],
   'Billing & Payments': [
     'view_billing',

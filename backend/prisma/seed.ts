@@ -1111,6 +1111,9 @@ async function seedUsers() {
       lastName: 'Admin',
       permissions: ['admin'], // Admin has all permissions
       // role field removed - now handled through StaffRoleAssignment
+      emergencyContactName: 'Jane Admin',
+      emergencyContactPhone: '+1234567890',
+      emergencyContactRelationship: 'Spouse',
     },
     {
       email: 'doctor.smith@hospital.com',
@@ -1215,43 +1218,43 @@ async function seedStaffMembers() {
       userId: admin!.id,
       employeeId: 'EMP001',
       departmentId: departmentMap.get('Administration'),
-      department: 'Administration',
       specialization: 'Hospital Management',
       licenseNumber: null,
+      serviceProvider: false, // Admin doesn't provide services
+      isActive: true, // Explicitly set as active
       hireDate: new Date('2020-01-15'),
     },
     {
       userId: doctorSmith!.id,
       employeeId: 'EMP002',
       departmentId: departmentMap.get('Cardiology'),
-      department: 'Cardiology',
       specialization: 'Cardiologist',
       licenseNumber: 'MD12345',
+      serviceProvider: true,
       hireDate: new Date('2018-03-20'),
     },
     {
       userId: doctorJohnson!.id,
       employeeId: 'EMP003',
       departmentId: departmentMap.get('Orthopedics'),
-      department: 'Orthopedics',
       specialization: 'Orthopedic Surgeon',
       licenseNumber: 'MD67890',
+      serviceProvider: true,
       hireDate: new Date('2019-06-10'),
     },
     {
       userId: nurseWilson!.id,
       employeeId: 'EMP004',
       departmentId: departmentMap.get('Emergency'),
-      department: 'Emergency',
       specialization: 'Emergency Care',
       licenseNumber: 'RN11111',
+      serviceProvider: true,
       hireDate: new Date('2021-02-14'),
     },
     {
       userId: cashierBrown!.id,
       employeeId: 'EMP005',
       departmentId: departmentMap.get('Finance'),
-      department: 'Finance',
       specialization: 'Cash Management',
       licenseNumber: null,
       hireDate: new Date('2020-08-01'),
@@ -1260,7 +1263,6 @@ async function seedStaffMembers() {
       userId: pharmacistDavis!.id,
       employeeId: 'EMP006',
       departmentId: departmentMap.get('Pharmacy'),
-      department: 'Pharmacy',
       specialization: 'Clinical Pharmacy',
       licenseNumber: 'PH22222',
       hireDate: new Date('2019-11-15'),
@@ -1269,7 +1271,6 @@ async function seedStaffMembers() {
       userId: labTech!.id,
       employeeId: 'EMP007',
       departmentId: departmentMap.get('Laboratory'),
-      department: 'Laboratory',
       specialization: 'Medical Technology',
       licenseNumber: 'MT33333',
       hireDate: new Date('2021-04-20'),
@@ -1315,6 +1316,15 @@ async function seedRoles() {
         'view_appointments',
         'create_appointments',
         'update_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'manage_appointment_slots',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_consultations',
         'create_consultations',
         'update_consultations',
@@ -1338,6 +1348,13 @@ async function seedRoles() {
         'update_patients',
         'view_appointments',
         'update_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'manage_provider_availability',
+        'view_provider_availability',
+        'manage_provider_schedules',
+        'manage_provider_time_off',
+        'view_appointment_slots',
         'view_consultations',
         'update_consultations',
         'view_lab_orders',
@@ -1411,6 +1428,11 @@ async function seedRoles() {
         'view_appointments',
         'create_appointments',
         'update_appointments',
+        'cancel_appointments',
+        'reschedule_appointments',
+        'view_provider_availability',
+        'view_appointment_slots',
+        'manage_appointment_waitlist',
         'view_billing',
         'create_invoices',
         'update_invoices',
@@ -2063,7 +2085,11 @@ async function seedAdmissions() {
 
   const patients = await prisma.patient.findMany({ take: 3 });
   const doctors = await prisma.staffMember.findMany({
-    where: { department: { in: ['Cardiology', 'Orthopedics'] } },
+    where: {
+      department: {
+        name: { in: ['Cardiology', 'Orthopedics'] },
+      },
+    },
     take: 2,
   });
   const wards = await prisma.ward.findMany({ take: 2 });
@@ -2100,7 +2126,11 @@ async function seedConsultations() {
 
   const patients = await prisma.patient.findMany({ take: 3 });
   const doctors = await prisma.staffMember.findMany({
-    where: { department: { in: ['Cardiology', 'Orthopedics'] } },
+    where: {
+      department: {
+        name: { in: ['Cardiology', 'Orthopedics'] },
+      },
+    },
     take: 2,
   });
 
@@ -2132,7 +2162,11 @@ async function seedLabOrders() {
 
   const patients = await prisma.patient.findMany({ take: 2 });
   const doctors = await prisma.staffMember.findMany({
-    where: { department: 'Cardiology' },
+    where: {
+      department: {
+        name: 'Cardiology',
+      },
+    },
     take: 1,
   });
 
@@ -2224,7 +2258,11 @@ async function seedPrescriptions() {
 
   const patients = await prisma.patient.findMany({ take: 2 });
   const doctors = await prisma.staffMember.findMany({
-    where: { department: 'Cardiology' },
+    where: {
+      department: {
+        name: 'Cardiology',
+      },
+    },
     take: 1,
   });
   const medications = await prisma.medication.findMany({ take: 3 });
@@ -2293,7 +2331,11 @@ async function seedSurgeries() {
 
   const patients = await prisma.patient.findMany({ take: 2 });
   const surgeons = await prisma.staffMember.findMany({
-    where: { department: 'Orthopedics' },
+    where: {
+      department: {
+        name: 'Orthopedics',
+      },
+    },
     take: 1,
   });
 
@@ -2372,7 +2414,11 @@ async function seedPayments() {
 
   const invoices = await prisma.invoice.findMany();
   const cashier = await prisma.staffMember.findFirst({
-    where: { department: 'Finance' },
+    where: {
+      department: {
+        name: 'Finance',
+      },
+    },
   });
 
   for (const invoice of invoices) {
@@ -2397,7 +2443,11 @@ async function seedCashTransactions() {
   console.log('💵 Seeding cash transactions...');
 
   const cashier = await prisma.staffMember.findFirst({
-    where: { department: 'Finance' },
+    where: {
+      department: {
+        name: 'Finance',
+      },
+    },
   });
   const patients = await prisma.patient.findMany({ take: 2 });
 
@@ -2422,10 +2472,18 @@ async function seedPettyCash() {
   console.log('💸 Seeding petty cash requests...');
 
   const nurse = await prisma.staffMember.findFirst({
-    where: { department: 'Emergency' },
+    where: {
+      department: {
+        name: 'Emergency',
+      },
+    },
   });
   const admin = await prisma.staffMember.findFirst({
-    where: { department: 'Administration' },
+    where: {
+      department: {
+        name: 'Administration',
+      },
+    },
   });
 
   if (nurse && admin) {
@@ -2450,13 +2508,19 @@ async function seedCashRequests() {
 
   const staffMembers = await prisma.staffMember.findMany({
     where: {
-      department: { in: ['Finance', 'Pharmacy', 'Laboratory', 'Emergency'] },
+      department: {
+        name: { in: ['Finance', 'Pharmacy', 'Laboratory', 'Emergency'] },
+      },
     },
     take: 4,
   });
 
   const cashier = await prisma.staffMember.findFirst({
-    where: { department: 'Finance' },
+    where: {
+      department: {
+        name: 'Finance',
+      },
+    },
   });
 
   if (staffMembers.length > 0 && cashier) {
@@ -2567,7 +2631,11 @@ async function seedDispensedMedications() {
   });
   const inventoryItems = await prisma.medicationInventory.findMany({ take: 3 });
   const pharmacist = await prisma.staffMember.findFirst({
-    where: { department: 'Pharmacy' },
+    where: {
+      department: {
+        name: 'Pharmacy',
+      },
+    },
   });
 
   if (
@@ -3135,21 +3203,29 @@ async function seedProviderSchedules() {
   const schedules: any[] = [];
   const daysOfWeek = [1, 2, 3, 4, 5]; // Monday to Friday
 
+  const dayNames = [
+    'SUNDAY',
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+  ];
+
   for (const doctor of doctors) {
     for (const day of daysOfWeek) {
       schedules.push(
         prisma.providerSchedule.create({
           data: {
             providerId: doctor.id,
-            dayOfWeek: day,
+            dayOfWeek: dayNames[day],
             startTime: '09:00',
             endTime: '17:00',
-            isAvailable: true,
-            maxAppointments: 16,
-            breakStart: '12:00',
-            breakEnd: '13:00',
-            slotDuration: 30,
-            bufferTime: 15,
+            isWorking: true,
+            maxAppointmentsPerHour: 2,
+            breakStartTime: '12:00',
+            breakEndTime: '13:00',
           },
         }),
       );

@@ -352,7 +352,7 @@ export class RolesService {
           include: {
             staffMember: {
               include: {
-                departmentRef: true,
+                department: true,
               },
             },
           },
@@ -367,8 +367,7 @@ export class RolesService {
     // Group staff members by department
     const departmentStats = role.staffRoleAssignments.reduce(
       (acc, assignment) => {
-        const deptName =
-          assignment.staffMember.departmentRef?.name || 'Unknown';
+        const deptName = assignment.staffMember.department?.name || 'Unknown';
         if (!acc[deptName]) {
           acc[deptName] = 0;
         }

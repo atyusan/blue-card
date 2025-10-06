@@ -1111,7 +1111,7 @@ function CreateCashRequestDialog({
                 </Typography>
                 <Typography variant='body2'>
                   <strong>Department:</strong>{' '}
-                  {user?.staffMember?.department || 'N/A'}
+                  {user?.staffMember?.department?.name || 'N/A'}
                 </Typography>
                 <Typography variant='body2'>
                   <strong>Date:</strong> {new Date().toLocaleDateString()}
@@ -2121,7 +2121,7 @@ function CashRequestDetailsDialog({
                   Department
                 </Typography>
                 <Typography variant='body1'>
-                  {request.requester?.department}
+                  {request.requester?.department?.name || 'N/A'}
                 </Typography>
               </Box>
               <Box>
