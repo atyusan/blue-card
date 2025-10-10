@@ -362,6 +362,36 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     ],
   },
   {
+    id: 'treatments',
+    label: 'Treatments',
+    icon: 'LocalHospital',
+    path: '/treatments',
+    permission: [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE],
+    children: [
+      {
+        id: 'treatments-list',
+        label: 'All Treatments',
+        icon: 'LocalHospital',
+        path: '/treatments',
+        permission: [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE],
+      },
+      {
+        id: 'treatments-active',
+        label: 'Active Treatments',
+        icon: 'MedicalServices',
+        path: '/treatments?status=ACTIVE',
+        permission: [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE],
+      },
+      {
+        id: 'treatments-emergency',
+        label: 'Emergency Treatments',
+        icon: 'Warning',
+        path: '/treatments?isEmergency=true',
+        permission: [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE],
+      },
+    ],
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     icon: 'Notifications',

@@ -38,6 +38,8 @@ import { PermissionTemplatesModule } from './permission-templates/permission-tem
 import { TemporaryPermissionsModule } from './temporary-permissions/temporary-permissions.module';
 import { PermissionAnalyticsModule } from './permission-analytics/permission-analytics.module';
 import { PermissionRequestsModule } from './permission-requests/permission-requests.module';
+import { TreatmentsModule } from './treatments/treatments.module';
+import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
   imports: [
@@ -89,6 +91,8 @@ import { PermissionRequestsModule } from './permission-requests/permission-reque
     TemporaryPermissionsModule,
     PermissionAnalyticsModule,
     PermissionRequestsModule,
+    TreatmentsModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [

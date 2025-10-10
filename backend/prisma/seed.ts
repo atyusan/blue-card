@@ -68,6 +68,7 @@ async function main() {
   }
 
   // Seed data in order of dependencies
+  await seedPermissions(); // Seed permissions first
   await seedUsers();
   await seedRoles();
   await seedDepartments();
@@ -1111,9 +1112,6 @@ async function seedUsers() {
       lastName: 'Admin',
       permissions: ['admin'], // Admin has all permissions
       // role field removed - now handled through StaffRoleAssignment
-      emergencyContactName: 'Jane Admin',
-      emergencyContactPhone: '+1234567890',
-      emergencyContactRelationship: 'Spouse',
     },
     {
       email: 'doctor.smith@hospital.com',
@@ -1284,6 +1282,589 @@ async function seedStaffMembers() {
   console.log(`✅ Created ${staffMembers.length} staff members`);
 }
 
+async function seedPermissions() {
+  console.log('🔐 Seeding permissions...');
+
+  // Check if permissions already exist
+  const existingPermissions = await prisma.permission.count();
+  if (existingPermissions > 0) {
+    console.log(
+      `⚠️  Permissions already exist (${existingPermissions}), skipping permission creation`,
+    );
+    return;
+  }
+
+  const permissions = [
+    // User Management
+    {
+      name: 'view_users',
+      displayName: 'View Users',
+      description: 'View user profiles and information',
+      category: 'User Management',
+      module: 'Users',
+    },
+    {
+      name: 'create_users',
+      displayName: 'Create Users',
+      description: 'Create new user accounts',
+      category: 'User Management',
+      module: 'Users',
+    },
+    {
+      name: 'update_users',
+      displayName: 'Update Users',
+      description: 'Edit user profiles and information',
+      category: 'User Management',
+      module: 'Users',
+    },
+    {
+      name: 'delete_users',
+      displayName: 'Delete Users',
+      description: 'Delete user accounts',
+      category: 'User Management',
+      module: 'Users',
+    },
+
+    // Patient Management
+    {
+      name: 'view_patients',
+      displayName: 'View Patients',
+      description: 'View patient records and information',
+      category: 'Patient Management',
+      module: 'Patients',
+    },
+    {
+      name: 'create_patients',
+      displayName: 'Create Patients',
+      description: 'Register new patients',
+      category: 'Patient Management',
+      module: 'Patients',
+    },
+    {
+      name: 'update_patients',
+      displayName: 'Update Patients',
+      description: 'Edit patient information',
+      category: 'Patient Management',
+      module: 'Patients',
+    },
+    {
+      name: 'delete_patients',
+      displayName: 'Delete Patients',
+      description: 'Delete patient records',
+      category: 'Patient Management',
+      module: 'Patients',
+    },
+
+    // Appointment Management
+    {
+      name: 'view_appointments',
+      displayName: 'View Appointments',
+      description: 'View appointment schedules and details',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'create_appointments',
+      displayName: 'Create Appointments',
+      description: 'Schedule new appointments',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'update_appointments',
+      displayName: 'Update Appointments',
+      description: 'Modify appointment details',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'cancel_appointments',
+      displayName: 'Cancel Appointments',
+      description: 'Cancel scheduled appointments',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'reschedule_appointments',
+      displayName: 'Reschedule Appointments',
+      description: 'Reschedule appointments to different times',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_appointment_slots',
+      displayName: 'Manage Appointment Slots',
+      description: 'Create and manage appointment time slots',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'view_appointment_slots',
+      displayName: 'View Appointment Slots',
+      description: 'View available appointment slots',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'delete_appointment_slots',
+      displayName: 'Delete Appointment Slots',
+      description: 'Remove appointment slots',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_appointment_waitlist',
+      displayName: 'Manage Waitlist',
+      description: 'Manage appointment waitlist',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_appointment_bundles',
+      displayName: 'Manage Bundles',
+      description: 'Create and manage appointment bundles',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_appointment_payments',
+      displayName: 'Manage Payments',
+      description: 'Process appointment payments',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_appointment_resources',
+      displayName: 'Manage Resources',
+      description: 'Manage appointment resources',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_patient_preferences',
+      displayName: 'Manage Patient Preferences',
+      description: 'Manage patient scheduling preferences',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'view_appointment_analytics',
+      displayName: 'View Analytics',
+      description: 'View appointment statistics and analytics',
+      category: 'Appointment Management',
+      module: 'Appointments',
+    },
+
+    // Provider Management
+    {
+      name: 'view_provider_availability',
+      displayName: 'View Provider Availability',
+      description: 'View provider schedules and availability',
+      category: 'Provider Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_provider_availability',
+      displayName: 'Manage Own Availability',
+      description: 'Manage own availability settings',
+      category: 'Provider Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_provider_schedules',
+      displayName: 'Manage Schedules',
+      description: 'Create and manage provider schedules',
+      category: 'Provider Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'manage_provider_time_off',
+      displayName: 'Manage Time Off',
+      description: 'Request and manage time off periods',
+      category: 'Provider Management',
+      module: 'Appointments',
+    },
+    {
+      name: 'approve_provider_time_off',
+      displayName: 'Approve Time Off',
+      description: 'Approve or reject time off requests',
+      category: 'Provider Management',
+      module: 'Appointments',
+    },
+
+    // Treatment Management
+    {
+      name: 'view_treatments',
+      displayName: 'View Treatments',
+      description: 'View treatment records and history',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'create_treatments',
+      displayName: 'Create Treatments',
+      description: 'Create new treatment records',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'update_treatments',
+      displayName: 'Update Treatments',
+      description: 'Modify treatment details',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'delete_treatments',
+      displayName: 'Delete Treatments',
+      description: 'Remove treatment records',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'update_treatment_status',
+      displayName: 'Update Treatment Status',
+      description: 'Change treatment status',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'manage_treatment_providers',
+      displayName: 'Manage Treatment Providers',
+      description: 'Add or remove providers from treatments',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+    {
+      name: 'manage_treatment_links',
+      displayName: 'Manage Treatment Links',
+      description: 'Create and manage treatment linkages',
+      category: 'Treatment Management',
+      module: 'Treatments',
+    },
+
+    // Consultation Management
+    {
+      name: 'view_consultations',
+      displayName: 'View Consultations',
+      description: 'View consultation records',
+      category: 'Consultation Management',
+      module: 'Consultations',
+    },
+    {
+      name: 'create_consultations',
+      displayName: 'Create Consultations',
+      description: 'Create new consultations',
+      category: 'Consultation Management',
+      module: 'Consultations',
+    },
+    {
+      name: 'update_consultations',
+      displayName: 'Update Consultations',
+      description: 'Modify consultation details',
+      category: 'Consultation Management',
+      module: 'Consultations',
+    },
+
+    // Laboratory Services
+    {
+      name: 'view_lab_orders',
+      displayName: 'View Lab Orders',
+      description: 'View laboratory test orders',
+      category: 'Laboratory Services',
+      module: 'Laboratory',
+    },
+    {
+      name: 'create_lab_orders',
+      displayName: 'Create Lab Orders',
+      description: 'Order laboratory tests',
+      category: 'Laboratory Services',
+      module: 'Laboratory',
+    },
+    {
+      name: 'update_lab_orders',
+      displayName: 'Update Lab Orders',
+      description: 'Modify lab orders',
+      category: 'Laboratory Services',
+      module: 'Laboratory',
+    },
+    {
+      name: 'view_lab_results',
+      displayName: 'View Lab Results',
+      description: 'View laboratory test results',
+      category: 'Laboratory Services',
+      module: 'Laboratory',
+    },
+    {
+      name: 'create_lab_results',
+      displayName: 'Create Lab Results',
+      description: 'Enter laboratory test results',
+      category: 'Laboratory Services',
+      module: 'Laboratory',
+    },
+
+    // Pharmacy Services
+    {
+      name: 'view_prescriptions',
+      displayName: 'View Prescriptions',
+      description: 'View prescription records',
+      category: 'Pharmacy Services',
+      module: 'Pharmacy',
+    },
+    {
+      name: 'create_prescriptions',
+      displayName: 'Create Prescriptions',
+      description: 'Write new prescriptions',
+      category: 'Pharmacy Services',
+      module: 'Pharmacy',
+    },
+    {
+      name: 'dispense_medications',
+      displayName: 'Dispense Medications',
+      description: 'Dispense prescribed medications',
+      category: 'Pharmacy Services',
+      module: 'Pharmacy',
+    },
+    {
+      name: 'manage_inventory',
+      displayName: 'Manage Inventory',
+      description: 'Manage medication inventory',
+      category: 'Pharmacy Services',
+      module: 'Pharmacy',
+    },
+
+    // Surgery Management
+    {
+      name: 'view_surgeries',
+      displayName: 'View Surgeries',
+      description: 'View surgical records',
+      category: 'Surgery Management',
+      module: 'Surgery',
+    },
+    {
+      name: 'create_surgeries',
+      displayName: 'Create Surgeries',
+      description: 'Schedule new surgeries',
+      category: 'Surgery Management',
+      module: 'Surgery',
+    },
+    {
+      name: 'update_surgeries',
+      displayName: 'Update Surgeries',
+      description: 'Modify surgical details',
+      category: 'Surgery Management',
+      module: 'Surgery',
+    },
+
+    // Billing & Finance
+    {
+      name: 'view_billing',
+      displayName: 'View Billing',
+      description: 'View billing information',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'create_invoices',
+      displayName: 'Create Invoices',
+      description: 'Generate new invoices',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'update_invoices',
+      displayName: 'Update Invoices',
+      description: 'Modify invoice details',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'delete_invoices',
+      displayName: 'Delete Invoices',
+      description: 'Remove invoices',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'create_payments',
+      displayName: 'Create Payments',
+      description: 'Process payments',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'update_payments',
+      displayName: 'Update Payments',
+      description: 'Modify payment records',
+      category: 'Billing & Finance',
+      module: 'Billing',
+    },
+    {
+      name: 'view_cash_transactions',
+      displayName: 'View Cash Transactions',
+      description: 'View cash transaction records',
+      category: 'Billing & Finance',
+      module: 'Cash Office',
+    },
+    {
+      name: 'create_cash_transactions',
+      displayName: 'Create Cash Transactions',
+      description: 'Record cash transactions',
+      category: 'Billing & Finance',
+      module: 'Cash Office',
+    },
+    {
+      name: 'view_cash_requests',
+      displayName: 'View Cash Requests',
+      description: 'View cash request records',
+      category: 'Billing & Finance',
+      module: 'Cash Office',
+    },
+    {
+      name: 'create_cash_requests',
+      displayName: 'Create Cash Requests',
+      description: 'Submit cash requests',
+      category: 'Billing & Finance',
+      module: 'Cash Office',
+    },
+
+    // Reports & Analytics
+    {
+      name: 'view_reports',
+      displayName: 'View Reports',
+      description: 'Access system reports',
+      category: 'Reports & Analytics',
+      module: 'Reporting',
+    },
+    {
+      name: 'create_reports',
+      displayName: 'Create Reports',
+      description: 'Generate custom reports',
+      category: 'Reports & Analytics',
+      module: 'Reporting',
+    },
+    {
+      name: 'export_reports',
+      displayName: 'Export Reports',
+      description: 'Export reports to various formats',
+      category: 'Reports & Analytics',
+      module: 'Reporting',
+    },
+
+    // Role & Permission Management
+    {
+      name: 'view_roles',
+      displayName: 'View Roles',
+      description: 'View role definitions',
+      category: 'Role & Permission Management',
+      module: 'Roles',
+    },
+    {
+      name: 'create_roles',
+      displayName: 'Create Roles',
+      description: 'Create new roles',
+      category: 'Role & Permission Management',
+      module: 'Roles',
+    },
+    {
+      name: 'update_roles',
+      displayName: 'Update Roles',
+      description: 'Modify role definitions',
+      category: 'Role & Permission Management',
+      module: 'Roles',
+    },
+    {
+      name: 'delete_roles',
+      displayName: 'Delete Roles',
+      description: 'Remove role definitions',
+      category: 'Role & Permission Management',
+      module: 'Roles',
+    },
+    {
+      name: 'assign_roles',
+      displayName: 'Assign Roles',
+      description: 'Assign roles to users',
+      category: 'Role & Permission Management',
+      module: 'Roles',
+    },
+
+    // Department Management
+    {
+      name: 'view_departments',
+      displayName: 'View Departments',
+      description: 'View department information',
+      category: 'Department Management',
+      module: 'Departments',
+    },
+    {
+      name: 'create_departments',
+      displayName: 'Create Departments',
+      description: 'Create new departments',
+      category: 'Department Management',
+      module: 'Departments',
+    },
+    {
+      name: 'update_departments',
+      displayName: 'Update Departments',
+      description: 'Modify department details',
+      category: 'Department Management',
+      module: 'Departments',
+    },
+    {
+      name: 'delete_departments',
+      displayName: 'Delete Departments',
+      description: 'Remove departments',
+      category: 'Department Management',
+      module: 'Departments',
+    },
+
+    // Service Management
+    {
+      name: 'view_services',
+      displayName: 'View Services',
+      description: 'View medical services',
+      category: 'Service Management',
+      module: 'Services',
+    },
+    {
+      name: 'create_services',
+      displayName: 'Create Services',
+      description: 'Create new services',
+      category: 'Service Management',
+      module: 'Services',
+    },
+    {
+      name: 'update_services',
+      displayName: 'Update Services',
+      description: 'Modify service details',
+      category: 'Service Management',
+      module: 'Services',
+    },
+    {
+      name: 'delete_services',
+      displayName: 'Delete Services',
+      description: 'Remove services',
+      category: 'Service Management',
+      module: 'Services',
+    },
+
+    // Admin Permission
+    {
+      name: 'admin',
+      displayName: 'Administrator',
+      description: 'Full system access - all permissions',
+      category: 'System Administration',
+      module: 'System',
+    },
+  ];
+
+  for (const permission of permissions) {
+    await prisma.permission.create({ data: permission });
+  }
+
+  console.log(`✅ Created ${permissions.length} permissions`);
+}
+
 async function seedRoles() {
   console.log('🎭 Seeding roles...');
 
@@ -1322,9 +1903,23 @@ async function seedRoles() {
         'view_provider_availability',
         'manage_provider_schedules',
         'manage_provider_time_off',
+        'approve_provider_time_off',
         'manage_appointment_slots',
         'view_appointment_slots',
+        'delete_appointment_slots',
         'manage_appointment_waitlist',
+        'manage_appointment_bundles',
+        'manage_appointment_payments',
+        'manage_appointment_resources',
+        'manage_patient_preferences',
+        'view_appointment_analytics',
+        'view_treatments',
+        'create_treatments',
+        'update_treatments',
+        'delete_treatments',
+        'update_treatment_status',
+        'manage_treatment_providers',
+        'manage_treatment_links',
         'view_consultations',
         'create_consultations',
         'update_consultations',
@@ -1355,6 +1950,9 @@ async function seedRoles() {
         'manage_provider_schedules',
         'manage_provider_time_off',
         'view_appointment_slots',
+        'manage_appointment_waitlist',
+        'view_treatments',
+        'update_treatment_status',
         'view_consultations',
         'update_consultations',
         'view_lab_orders',
@@ -1432,7 +2030,11 @@ async function seedRoles() {
         'reschedule_appointments',
         'view_provider_availability',
         'view_appointment_slots',
+        'manage_appointment_slots',
         'manage_appointment_waitlist',
+        'manage_appointment_bundles',
+        'manage_appointment_resources',
+        'manage_patient_preferences',
         'view_billing',
         'create_invoices',
         'update_invoices',

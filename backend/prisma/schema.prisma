@@ -27,6 +27,13 @@ model User {
   permissionApprovals  PermissionApprover[]
   permissionAudits     PermissionAudit[]
 
+  // Treatment System Relations
+  createdTreatments      Treatment[]     @relation("TreatmentCreator")
+  updatedTreatments      Treatment[]     @relation("TreatmentUpdater")
+  reviewedLabResults     LabResult[]     @relation("LabResultReviewer")
+  reviewedImagingResults ImagingResult[] @relation("ImagingResultReviewer")
+  createdTreatmentLinks  TreatmentLink[] @relation("TreatmentLinkCreator")
+
   @@map("users")
 }
 
@@ -43,6 +50,9 @@ model Department {
   staffMembers StaffMember[]
   services     Service[]
   cashRequests CashRequest[]
+
+  // Treatment System Relations
+  referrals Referral[] @relation("ReferralDepartment")
 
   @@map("departments")
 }
@@ -61,6 +71,22 @@ model Role {
   staffRoleAssignments StaffRoleAssignment[]
 
   @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., 'view_patients'
+  displayName String // e.g., 'View Patients'
+  description String? // What this permission allows
+  category    String // e.g., 'Patient Management'
+  module      String? // e.g., 'Patients', 'Appointments', 'Treatments'
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([module])
+  @@map("permissions")
 }
 
 model StaffRoleAssignment {
@@ -113,7 +139,6 @@ model StaffMember {
   labOrders                 LabOrder[]
   pettyCashApprovals        PettyCash[]       @relation("PettyCashApprover")
   pettyCashRequests         PettyCash[]       @relation("PettyCashRequester")
-  prescriptions             Prescription[]
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   anesthesiologistSurgeries Surgery[]         @relation("Anesthesiologist")
   surgeries                 Surgery[]
@@ -129,6 +154,20 @@ model StaffMember {
   providerSchedules ProviderSchedule[] @relation("ProviderSchedules")
   providerTimeOff   ProviderTimeOff[]  @relation("ProviderTimeOff")
   timeOffApprovals  ProviderTimeOff[]  @relation("TimeOffApprover")
+
+  // Treatment System Relations
+  primaryTreatments  Treatment[]         @relation("PrimaryProvider")
+  treatmentProviders TreatmentProvider[] @relation("TreatmentProvider")
+  diagnoses          Diagnosis[]         @relation("DiagnosisProvider")
+  prescriptions      Prescription[] // Original prescription relation
+  labRequests        LabRequest[]        @relation("LabRequestProvider")
+  labProvider        LabRequest[]        @relation("LabProvider")
+  imagingRequests    ImagingRequest[]    @relation("ImagingRequestProvider")
+  imagingProvider    ImagingRequest[]    @relation("ImagingProvider")
+  procedures         Procedure[]         @relation("ProcedureProvider")
+  referralsFrom      Referral[]          @relation("ReferralFrom")
+  referralsTo        Referral[]          @relation("ReferralTo")
+  treatmentNotes     TreatmentNote[]     @relation("TreatmentNoteProvider")
 
   @@map("staff_members")
 }
@@ -174,6 +213,9 @@ model Patient {
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
   preferences     PatientPreference[]
+
+  // Treatment System Relations
+  treatments Treatment[]
 
   @@map("patients")
 }
@@ -354,6 +396,7 @@ model Prescription {
   id               String                   @id @default(cuid())
   patientId        String
   doctorId         String
+  treatmentId      String? // Link to treatment (optional for backward compatibility)
   prescriptionDate DateTime                 @default(now())
   status           PrescriptionStatus       @default(PENDING)
   isPaid           Boolean                  @default(false)
@@ -366,6 +409,7 @@ model Prescription {
   medications      PrescriptionMedication[]
   doctor           StaffMember              @relation(fields: [doctorId], references: [id])
   patient          Patient                  @relation(fields: [patientId], references: [id])
+  treatment        Treatment?               @relation(fields: [treatmentId], references: [id])
 
   @@map("prescriptions")
 }
@@ -871,7 +915,10 @@ model Appointment {
   invoice           Invoice?                  @relation(fields: [invoiceId], references: [id])
   notifications     AppointmentNotification[]
   preferences       PatientPreference[]
-  waitlist          WaitlistEntry?
+  waitlist          WaitlistEntry[]
+
+  // Treatment System Relations
+  treatments Treatment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -955,6 +1002,466 @@ model AppointmentNotification {
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   @@map("appointment_notifications")
+}
+
+// Treatment System Models
+model Treatment {
+  id                String  @id @default(cuid())
+  patientId         String
+  primaryProviderId String // Main doctor/primary provider
+  appointmentId     String? // Can be null for emergency treatments
+
+  // Treatment Details
+  title         String
+  description   String?
+  treatmentType TreatmentType
+  status        TreatmentStatus   @default(ACTIVE)
+  priority      TreatmentPriority @default(ROUTINE)
+
+  // Treatment Timeline
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  lastUpdated DateTime  @updatedAt
+
+  // Clinical Information
+  chiefComplaint          String?
+  historyOfPresentIllness String?
+  pastMedicalHistory      String?
+  allergies               String?
+  medications             String?
+
+  // Emergency Handling
+  isEmergency    Boolean         @default(false)
+  emergencyLevel EmergencyLevel?
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  updatedBy String?
+
+  // Relations
+  patient         Patient      @relation(fields: [patientId], references: [id])
+  primaryProvider StaffMember  @relation("PrimaryProvider", fields: [primaryProviderId], references: [id])
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+  creator         User         @relation("TreatmentCreator", fields: [createdBy], references: [id])
+  updater         User?        @relation("TreatmentUpdater", fields: [updatedBy], references: [id])
+
+  // Treatment Activities
+  diagnoses       Diagnosis[]
+  prescriptions   Prescription[]
+  labRequests     LabRequest[]
+  imagingRequests ImagingRequest[]
+  procedures      Procedure[]
+  referrals       Referral[]
+  notes           TreatmentNote[]
+  providers       TreatmentProvider[]
+
+  // Treatment Links
+  linkedFromTreatments TreatmentLink[] @relation("LinkedFromTreatment")
+  linkedToTreatments   TreatmentLink[] @relation("LinkedToTreatment")
+
+  @@map("treatments")
+}
+
+model TreatmentProvider {
+  id                     String       @id @default(cuid())
+  treatmentId            String
+  providerId             String
+  role                   ProviderRole
+  isActive               Boolean      @default(true)
+  joinedAt               DateTime     @default(now())
+  leftAt                 DateTime?
+  transferAcknowledged   Boolean      @default(false)
+  transferAcknowledgedAt DateTime?
+
+  // Relations
+  treatment Treatment   @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  provider  StaffMember @relation("TreatmentProvider", fields: [providerId], references: [id])
+
+  @@unique([treatmentId, providerId])
+  @@map("treatment_providers")
+}
+
+model Diagnosis {
+  id            String          @id @default(cuid())
+  treatmentId   String
+  providerId    String
+  diagnosisCode String? // ICD-10 code
+  diagnosisName String
+  description   String?
+  status        DiagnosisStatus @default(ACTIVE)
+  isPrimary     Boolean         @default(false)
+  diagnosedAt   DateTime        @default(now())
+
+  // Relations
+  treatment Treatment   @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  provider  StaffMember @relation("DiagnosisProvider", fields: [providerId], references: [id])
+
+  @@map("diagnoses")
+}
+
+model LabRequest {
+  id                   String           @id @default(cuid())
+  treatmentId          String
+  requestingProviderId String
+  testType             String
+  testName             String
+  description          String?
+  urgency              LabUrgency       @default(ROUTINE)
+  status               LabRequestStatus @default(REQUESTED)
+  requestedAt          DateTime         @default(now())
+  scheduledAt          DateTime?
+  completedAt          DateTime?
+
+  // Lab Details
+  labProviderId          String? // Lab technician/provider
+  specimenType           String?
+  collectionInstructions String?
+
+  // Relations
+  treatment          Treatment    @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  requestingProvider StaffMember  @relation("LabRequestProvider", fields: [requestingProviderId], references: [id])
+  labProvider        StaffMember? @relation("LabProvider", fields: [labProviderId], references: [id])
+  results            LabResult[]
+
+  @@map("lab_requests")
+}
+
+model LabResult {
+  id           String          @id @default(cuid())
+  labRequestId String
+  resultType   String
+  resultValue  String?
+  normalRange  String?
+  unit         String?
+  status       LabResultStatus @default(PENDING)
+  notes        String?
+  completedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedBy   String?
+
+  // Relations
+  labRequest LabRequest @relation(fields: [labRequestId], references: [id], onDelete: Cascade)
+  reviewer   User?      @relation("LabResultReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("lab_results")
+}
+
+model ImagingRequest {
+  id                   String               @id @default(cuid())
+  treatmentId          String
+  requestingProviderId String
+  imagingType          ImagingType
+  bodyPart             String
+  description          String?
+  urgency              ImagingUrgency       @default(ROUTINE)
+  status               ImagingRequestStatus @default(REQUESTED)
+  requestedAt          DateTime             @default(now())
+  scheduledAt          DateTime?
+  completedAt          DateTime?
+
+  // Imaging Details
+  imagingProviderId       String? // Radiologist/technician
+  contrastRequired        Boolean @default(false)
+  preparationInstructions String?
+
+  // Relations
+  treatment          Treatment       @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  requestingProvider StaffMember     @relation("ImagingRequestProvider", fields: [requestingProviderId], references: [id])
+  imagingProvider    StaffMember?    @relation("ImagingProvider", fields: [imagingProviderId], references: [id])
+  results            ImagingResult[]
+
+  @@map("imaging_requests")
+}
+
+model ImagingResult {
+  id               String              @id @default(cuid())
+  imagingRequestId String
+  finding          String?
+  impression       String?
+  recommendation   String?
+  status           ImagingResultStatus @default(PENDING)
+  completedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+
+  // File attachments
+  imageUrls String[] // Array of image URLs
+
+  // Relations
+  imagingRequest ImagingRequest @relation(fields: [imagingRequestId], references: [id], onDelete: Cascade)
+  reviewer       User?          @relation("ImagingResultReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("imaging_results")
+}
+
+model Procedure {
+  id            String          @id @default(cuid())
+  treatmentId   String
+  providerId    String
+  procedureName String
+  procedureCode String? // CPT code
+  description   String?
+  status        ProcedureStatus @default(SCHEDULED)
+  scheduledAt   DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  duration      Int? // Duration in minutes
+
+  // Procedure Details
+  anesthesia    String?
+  complications String?
+  notes         String?
+
+  // Relations
+  treatment Treatment   @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  provider  StaffMember @relation("ProcedureProvider", fields: [providerId], references: [id])
+
+  @@map("procedures")
+}
+
+model Referral {
+  id             String          @id @default(cuid())
+  treatmentId    String
+  fromProviderId String
+  toProviderId   String?
+  toDepartmentId String?
+  referralType   ReferralType
+  reason         String
+  urgency        ReferralUrgency @default(ROUTINE)
+  status         ReferralStatus  @default(PENDING)
+  referredAt     DateTime        @default(now())
+  acceptedAt     DateTime?
+  completedAt    DateTime?
+  notes          String?
+
+  // Relations
+  treatment    Treatment    @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  fromProvider StaffMember  @relation("ReferralFrom", fields: [fromProviderId], references: [id])
+  toProvider   StaffMember? @relation("ReferralTo", fields: [toProviderId], references: [id])
+  toDepartment Department?  @relation("ReferralDepartment", fields: [toDepartmentId], references: [id])
+
+  @@map("referrals")
+}
+
+model TreatmentNote {
+  id          String   @id @default(cuid())
+  treatmentId String
+  providerId  String
+  noteType    NoteType
+  content     String
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  treatment Treatment   @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  provider  StaffMember @relation("TreatmentNoteProvider", fields: [providerId], references: [id])
+
+  @@map("treatment_notes")
+}
+
+model TreatmentLink {
+  id              String            @id @default(cuid())
+  fromTreatmentId String
+  toTreatmentId   String
+  linkType        TreatmentLinkType
+  linkReason      String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  isActive        Boolean           @default(true)
+  notes           String?
+
+  // Relations
+  fromTreatment Treatment @relation("LinkedFromTreatment", fields: [fromTreatmentId], references: [id], onDelete: Cascade)
+  toTreatment   Treatment @relation("LinkedToTreatment", fields: [toTreatmentId], references: [id], onDelete: Cascade)
+  creator       User      @relation("TreatmentLinkCreator", fields: [createdBy], references: [id])
+
+  @@unique([fromTreatmentId, toTreatmentId, linkType])
+  @@map("treatment_links")
+}
+
+// Enums for Treatment System
+enum TreatmentType {
+  CONSULTATION
+  FOLLOW_UP
+  EMERGENCY
+  SURGERY
+  THERAPY
+  REHABILITATION
+  PREVENTIVE
+  DIAGNOSTIC
+}
+
+enum TreatmentStatus {
+  ACTIVE
+  SUSPENDED
+  COMPLETED
+  TRANSFERRED
+  CANCELLED
+}
+
+enum TreatmentPriority {
+  EMERGENCY
+  URGENT
+  ROUTINE
+  FOLLOW_UP
+}
+
+enum EmergencyLevel {
+  CRITICAL
+  HIGH
+  MODERATE
+  LOW
+}
+
+enum ProviderRole {
+  PRIMARY
+  CONSULTANT
+  SPECIALIST
+  ASSISTANT
+  SUPERVISOR
+}
+
+enum DiagnosisStatus {
+  ACTIVE
+  RESOLVED
+  CHRONIC
+  RULED_OUT
+}
+
+enum LabRequestStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LabUrgency {
+  STAT
+  URGENT
+  ROUTINE
+}
+
+enum LabResultStatus {
+  PENDING
+  COMPLETED
+  CRITICAL
+  CANCELLED
+}
+
+enum ImagingRequestStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ImagingType {
+  XRAY
+  CT_SCAN
+  MRI
+  ULTRASOUND
+  MAMMOGRAM
+  PET_SCAN
+  NUCLEAR_MEDICINE
+  FLUOROSCOPY
+}
+
+enum ImagingUrgency {
+  STAT
+  URGENT
+  ROUTINE
+}
+
+enum ImagingResultStatus {
+  PENDING
+  COMPLETED
+  CRITICAL
+  CANCELLED
+}
+
+enum ProcedureStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+enum AdmissionType {
+  EMERGENCY
+  ELECTIVE
+  TRANSFER
+  OBSERVATION
+}
+
+enum AdmissionStatus {
+  ADMITTED
+  DISCHARGED
+  TRANSFERRED
+  CANCELLED
+}
+
+enum ReferralType {
+  SPECIALIST
+  SECOND_OPINION
+  DIAGNOSTIC
+  THERAPY
+  SURGERY
+  EMERGENCY
+}
+
+enum ReferralUrgency {
+  EMERGENCY
+  URGENT
+  ROUTINE
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum NoteType {
+  PROGRESS
+  ASSESSMENT
+  PLAN
+  EDUCATION
+  COMMUNICATION
+  INCIDENT
+}
+
+enum WardType {
+  GENERAL
+  PRIVATE
+  ICU
+  EMERGENCY
+  SURGICAL
+  MEDICAL
+  PEDIATRIC
+  MATERNITY
+  NURSERY
+  PSYCHIATRIC
+  REHABILITATION
+}
+
+enum TreatmentLinkType {
+  FOLLOW_UP
+  ESCALATION
+  REFERRAL
+  CONTINUATION
+  PREPROCEDURE
+  POSTPROCEDURE
+  SERIES
+  PARALLEL
+  REPLACEMENT
+  CANCELLATION
 }
 
 model ProviderSchedule {
@@ -1087,22 +1594,6 @@ enum PrescriptionStatus {
   PENDING
   DISPENSED
   CANCELLED
-}
-
-enum AdmissionStatus {
-  ADMITTED
-  DISCHARGED
-  TRANSFERRED
-  CANCELLED
-}
-
-enum WardType {
-  GENERAL
-  PRIVATE
-  ICU
-  NURSERY
-  MATERNITY
-  PEDIATRIC
 }
 
 enum SurgeryStatus {

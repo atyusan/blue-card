@@ -51,103 +51,10 @@ import type {
   CreateRoleData,
   RoleStats,
 } from '../services/roles.service';
-
-// Group permissions by category
-const PERMISSION_CATEGORIES = {
-  'User Management': [
-    'view_users',
-    'create_users',
-    'edit_users',
-    'delete_users',
-    'manage_user_permissions',
-  ],
-  'Patient Management': [
-    'view_patients',
-    'create_patients',
-    'edit_patients',
-    'delete_patients',
-    'view_patient_history',
-  ],
-  'Department Management': [
-    'view_departments',
-    'create_departments',
-    'edit_departments',
-    'delete_departments',
-    'manage_departments',
-  ],
-  'Service Management': [
-    'view_services',
-    'create_services',
-    'edit_services',
-    'delete_services',
-    'manage_service_pricing',
-  ],
-  'Role Management': [
-    'view_roles',
-    'create_roles',
-    'edit_roles',
-    'delete_roles',
-    'assign_roles',
-  ],
-  'Billing & Invoicing': [
-    'view_billing',
-    'create_invoices',
-    'edit_invoices',
-    'delete_invoices',
-    'process_payments',
-    'view_payment_history',
-  ],
-  'Laboratory Services': [
-    'view_lab_orders',
-    'create_lab_orders',
-    'edit_lab_orders',
-    'process_lab_tests',
-    'view_lab_results',
-  ],
-  'Pharmacy Services': [
-    'view_pharmacy',
-    'manage_medications',
-    'process_prescriptions',
-    'view_inventory',
-  ],
-  'Admissions & Wards': [
-    'view_admissions',
-    'create_admissions',
-    'edit_admissions',
-    'manage_wards',
-    'view_ward_assignments',
-  ],
-  'Surgical Services': [
-    'view_surgery',
-    'create_surgery',
-    'edit_surgery',
-    'manage_surgery_schedule',
-  ],
-  Consultations: [
-    'view_consultations',
-    'create_consultations',
-    'edit_consultations',
-    'manage_appointments',
-  ],
-  'Reporting & Analytics': [
-    'view_reports',
-    'generate_reports',
-    'view_analytics',
-    'export_data',
-  ],
-  'System Administration': [
-    'system_settings',
-    'audit_logs',
-    'backup_restore',
-    'user_management',
-  ],
-  'Cash Office': [
-    'view_cash_office',
-    'manage_cash_transactions',
-    'process_cash_requests',
-    'view_cash_reports',
-  ],
-};
+import {
+  permissionsService,
+  type Permission,
+} from '../services/permissions.service';
 
 export const RolesPage: React.FC = () => {
   const { canManageRoles, canViewRoles } = usePermissions();
@@ -167,6 +74,12 @@ export const RolesPage: React.FC = () => {
   >('success');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+
+  // Dynamic permissions state
+  const [permissionCategories, setPermissionCategories] = useState<
+    Record<string, Permission[]>
+  >({});
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
 
   // Form state
   const [roleForm, setRoleForm] = useState<CreateRoleData>({
@@ -205,15 +118,17 @@ export const RolesPage: React.FC = () => {
   };
 
   // Helper function to check if all permissions in a category are selected
-  const areAllCategoryPermissionsSelected = (categoryPermissions: string[]) => {
+  const areAllCategoryPermissionsSelected = (
+    categoryPermissions: Permission[]
+  ) => {
     return categoryPermissions.every((permission) =>
-      (roleForm.permissions || []).includes(permission)
+      (roleForm.permissions || []).includes(permission.name)
     );
   };
 
   // Helper function to handle category permission selection
   const handleCategoryPermissionChange = (
-    categoryPermissions: string[],
+    categoryPermissions: Permission[],
     checked: boolean
   ) => {
     setRoleForm((prev) => {
@@ -222,14 +137,14 @@ export const RolesPage: React.FC = () => {
       if (checked) {
         // Add all permissions from this category
         categoryPermissions.forEach((permission) => {
-          if (!newPermissions.includes(permission)) {
-            newPermissions.push(permission);
+          if (!newPermissions.includes(permission.name)) {
+            newPermissions.push(permission.name);
           }
         });
       } else {
         // Remove all permissions from this category
         categoryPermissions.forEach((permission) => {
-          const index = newPermissions.indexOf(permission);
+          const index = newPermissions.indexOf(permission.name);
           if (index > -1) {
             newPermissions.splice(index, 1);
           }
@@ -242,6 +157,33 @@ export const RolesPage: React.FC = () => {
       };
     });
   };
+
+  // Show snackbar helper
+  const showSnackbar = useCallback(
+    (
+      message: string,
+      severity: 'success' | 'error' | 'warning' = 'success'
+    ) => {
+      setSnackbarMessage(message);
+      setSnackbarSeverity(severity);
+      setSnackbarOpen(true);
+    },
+    []
+  );
+
+  // Load permissions from API
+  const loadPermissions = useCallback(async () => {
+    try {
+      setIsLoadingPermissions(true);
+      const response = await permissionsService.getAll();
+      setPermissionCategories(response.groupedPermissions);
+    } catch (error) {
+      console.error('Failed to load permissions:', error);
+      showSnackbar('Failed to load permissions', 'error');
+    } finally {
+      setIsLoadingPermissions(false);
+    }
+  }, [showSnackbar]);
 
   // Load roles function for CRUD operations
   const loadRoles = useCallback(async () => {
@@ -259,12 +201,14 @@ export const RolesPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [canViewRoles]);
 
-  // Load roles on component mount only
+  // Load permissions and roles on component mount only
   useEffect(() => {
+    loadPermissions();
     loadRoles();
-  }, [loadRoles]); // Depend on loadRoles
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Client-side filtering
   const filteredRoles = roles.filter(
@@ -396,11 +340,11 @@ export const RolesPage: React.FC = () => {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || isLoadingPermissions) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant='h6' sx={{ textAlign: 'center', mb: 3 }}>
-          Loading roles...
+          {isLoadingPermissions ? 'Loading permissions...' : 'Loading roles...'}
         </Typography>
         <Box
           sx={{
@@ -819,11 +763,11 @@ export const RolesPage: React.FC = () => {
                       bgcolor: 'grey.50',
                     }}
                   >
-                    {Object.entries(PERMISSION_CATEGORIES).map(
+                    {Object.entries(permissionCategories).map(
                       ([categoryName, categoryPermissions]) => {
                         const categorySelectedPermissions =
                           categoryPermissions.filter((p) =>
-                            (roleForm.permissions || []).includes(p)
+                            (roleForm.permissions || []).includes(p.name)
                           );
 
                         if (categorySelectedPermissions.length === 0)
@@ -868,13 +812,12 @@ export const RolesPage: React.FC = () => {
                             >
                               {categorySelectedPermissions.map((permission) => (
                                 <Chip
-                                  key={permission}
-                                  label={permission}
+                                  key={permission.name}
+                                  label={permission.displayName}
                                   color='primary'
                                   variant='outlined'
                                   size='small'
                                   sx={{
-                                    fontFamily: 'monospace',
                                     fontSize: '0.75rem',
                                   }}
                                 />
@@ -1096,7 +1039,7 @@ export const RolesPage: React.FC = () => {
                       p: 2,
                     }}
                   >
-                    {Object.entries(PERMISSION_CATEGORIES).map(
+                    {Object.entries(permissionCategories).map(
                       ([categoryName, categoryPermissions]) => (
                         <Box key={categoryName} sx={{ mb: 3 }}>
                           <FormControlLabel
@@ -1107,7 +1050,9 @@ export const RolesPage: React.FC = () => {
                                 )}
                                 indeterminate={
                                   categoryPermissions.some((p) =>
-                                    (roleForm.permissions || []).includes(p)
+                                    (roleForm.permissions || []).includes(
+                                      p.name
+                                    )
                                   ) &&
                                   !areAllCategoryPermissionsSelected(
                                     categoryPermissions
@@ -1134,15 +1079,15 @@ export const RolesPage: React.FC = () => {
                             <FormGroup>
                               {categoryPermissions.map((permission) => (
                                 <FormControlLabel
-                                  key={permission}
+                                  key={permission.name}
                                   control={
                                     <Checkbox
                                       checked={(
                                         roleForm.permissions || []
-                                      ).includes(permission)}
+                                      ).includes(permission.name)}
                                       onChange={(e) =>
                                         handlePermissionChange(
-                                          permission,
+                                          permission.name,
                                           e.target.checked
                                         )
                                       }
@@ -1150,15 +1095,22 @@ export const RolesPage: React.FC = () => {
                                     />
                                   }
                                   label={
-                                    <Typography
-                                      variant='body2'
-                                      sx={{
-                                        textTransform: 'replace',
-                                        fontFamily: 'monospace',
-                                      }}
-                                    >
-                                      {permission}
-                                    </Typography>
+                                    <Box>
+                                      <Typography
+                                        variant='body2'
+                                        sx={{ fontWeight: 500 }}
+                                      >
+                                        {permission.displayName}
+                                      </Typography>
+                                      {permission.description && (
+                                        <Typography
+                                          variant='caption'
+                                          sx={{ color: 'text.secondary' }}
+                                        >
+                                          {permission.description}
+                                        </Typography>
+                                      )}
+                                    </Box>
                                   }
                                 />
                               ))}

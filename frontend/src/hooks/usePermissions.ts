@@ -163,6 +163,60 @@ export const usePermissions = () => {
     );
   }, [hasPermission, isAdmin]);
 
+  // Appointment permission methods
+  const canViewAppointments = useCallback((): boolean => {
+    return hasPermission('view_appointments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canCreateAppointments = useCallback((): boolean => {
+    return hasPermission('create_appointments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canUpdateAppointments = useCallback((): boolean => {
+    return hasPermission('update_appointments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canCancelAppointments = useCallback((): boolean => {
+    return hasPermission('cancel_appointments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canRescheduleAppointments = useCallback((): boolean => {
+    return hasPermission('reschedule_appointments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canManageAppointmentPayments = useCallback((): boolean => {
+    return hasPermission('manage_appointment_payments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  // Treatment permission methods
+  const canViewTreatments = useCallback((): boolean => {
+    return hasPermission('view_treatments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canCreateTreatments = useCallback((): boolean => {
+    return hasPermission('create_treatments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canUpdateTreatments = useCallback((): boolean => {
+    return hasPermission('update_treatments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canDeleteTreatments = useCallback((): boolean => {
+    return hasPermission('delete_treatments') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canUpdateTreatmentStatus = useCallback((): boolean => {
+    return hasPermission('update_treatment_status') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canManageTreatmentProviders = useCallback((): boolean => {
+    return hasPermission('manage_treatment_providers') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canManageTreatmentLinks = useCallback((): boolean => {
+    return hasPermission('manage_treatment_links') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -183,6 +237,21 @@ export const usePermissions = () => {
     canCreateStaff,
     canEditStaff,
     canDeleteStaff,
+    // Appointment permissions
+    canViewAppointments,
+    canCreateAppointments,
+    canUpdateAppointments,
+    canCancelAppointments,
+    canRescheduleAppointments,
+    canManageAppointmentPayments,
+    // Treatment permissions
+    canViewTreatments,
+    canCreateTreatments,
+    canUpdateTreatments,
+    canDeleteTreatments,
+    canUpdateTreatmentStatus,
+    canManageTreatmentProviders,
+    canManageTreatmentLinks,
     user,
   };
 };

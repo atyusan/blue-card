@@ -27,19 +27,27 @@ import {
   Warning,
   Schedule,
   AttachMoney,
+  Sync,
+  ThumbUp,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
 import { dashboardService } from '../services/dashboard.service';
+import { treatmentService } from '../services/treatment.service';
 import { formatCurrency, formatDate } from '../utils';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, staffMember, isAdmin, isLoading: authLoading } = useAuth();
+  const { canViewTreatments } = usePermissions();
+
+  const isAdminUser = isAdmin();
 
   // Fetch dashboard data only when user is authenticated
   const {
@@ -54,11 +62,41 @@ const DashboardPage: React.FC = () => {
     enabled: !!user && !authLoading, // Only run when user is authenticated and auth is not loading
   });
 
+  // Fetch transferred treatments (only for non-admin providers)
+  const { data: transferredData } = useQuery({
+    queryKey: ['dashboard-transferred-treatments'],
+    queryFn: () =>
+      treatmentService.getTransferredTreatments({ acknowledged: false }),
+    refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes
+    enabled:
+      !!user &&
+      !authLoading &&
+      canViewTreatments() &&
+      !isAdminUser &&
+      !!staffMember,
+  });
+
+  // Acknowledge transfer mutation
+  const acknowledgeTransferMutation = useMutation({
+    mutationFn: (treatmentId: string) =>
+      treatmentService.acknowledgeTransfer(treatmentId),
+    onSuccess: () => {
+      showSuccess('Transfer acknowledged successfully');
+      queryClient.invalidateQueries({
+        queryKey: ['dashboard-transferred-treatments'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['transferred-treatments'] });
+    },
+    onError: (error: any) => {
+      showError(error.message || 'Failed to acknowledge transfer');
+    },
+  });
+
   const handleRefresh = async () => {
     try {
       await refetch();
       showSuccess('Dashboard refreshed successfully');
-    } catch (_error) {
+    } catch {
       showError('Failed to refresh dashboard');
     }
   };
@@ -77,7 +115,7 @@ const DashboardPage: React.FC = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       showSuccess('Dashboard report downloaded successfully');
-    } catch (_error) {
+    } catch {
       showError('Failed to download dashboard report');
     }
   };
@@ -504,6 +542,132 @@ const DashboardPage: React.FC = () => {
               </Box>
             </CardContent>
           </Card>
+
+          {/* Pending Transfers Widget */}
+          {canViewTreatments() &&
+            transferredData &&
+            transferredData.unacknowledged > 0 && (
+              <Card
+                sx={{
+                  background: `linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(255, 152, 0, 0.05) 100%)`,
+                  border: '1px solid rgba(255, 152, 0, 0.3)',
+                }}
+              >
+                <CardHeader
+                  title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Sync sx={{ color: 'warning.main' }} />
+                      <Typography variant='h6' fontWeight={600}>
+                        Pending Transfers
+                      </Typography>
+                    </Box>
+                  }
+                  subheader='Treatments transferred to you'
+                  action={
+                    <Chip
+                      label={transferredData.unacknowledged}
+                      color='warning'
+                      size='small'
+                      sx={{ fontWeight: 700 }}
+                    />
+                  }
+                />
+                <CardContent sx={{ pt: 0 }}>
+                  {transferredData.treatments
+                    .slice(0, 3)
+                    .map((treatment, index) => (
+                      <Box
+                        key={treatment.id}
+                        sx={{
+                          p: 2,
+                          mb: index < 2 ? 2 : 0,
+                          borderRadius: 2,
+                          bgcolor: 'background.paper',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            boxShadow: 2,
+                            transform: 'translateY(-2px)',
+                          },
+                        }}
+                        onClick={() => navigate(`/treatments/${treatment.id}`)}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            mb: 1,
+                          }}
+                        >
+                          <Box>
+                            <Typography variant='body1' fontWeight={600}>
+                              {treatment.title}
+                            </Typography>
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                            >
+                              Patient: {treatment.patient?.firstName}{' '}
+                              {treatment.patient?.lastName}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={treatment.priority}
+                            size='small'
+                            color={
+                              treatment.priority === 'EMERGENCY'
+                                ? 'error'
+                                : treatment.priority === 'URGENT'
+                                ? 'warning'
+                                : 'default'
+                            }
+                          />
+                        </Box>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            mt: 2,
+                          }}
+                        >
+                          <Typography variant='caption' color='text.secondary'>
+                            {formatDate(treatment.updatedAt)}
+                          </Typography>
+                          <Button
+                            size='small'
+                            variant='contained'
+                            color='success'
+                            startIcon={<ThumbUp />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              acknowledgeTransferMutation.mutate(treatment.id);
+                            }}
+                            disabled={acknowledgeTransferMutation.isPending}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            Acknowledge
+                          </Button>
+                        </Box>
+                      </Box>
+                    ))}
+                  {transferredData.unacknowledged > 3 && (
+                    <Button
+                      fullWidth
+                      variant='outlined'
+                      color='warning'
+                      onClick={() => navigate('/treatments?tab=transferred')}
+                      sx={{ mt: 2, borderRadius: 2 }}
+                    >
+                      View All ({transferredData.unacknowledged})
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
           {/* Upcoming Appointments */}
           {dashboardData.upcomingAppointments &&

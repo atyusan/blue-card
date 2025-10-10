@@ -45,16 +45,29 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { appointmentService } from '../services/appointment.service';
+import { staffService } from '../services/staff.service';
 import PageHeader from '../components/common/PageHeader';
 import Breadcrumb from '../components/common/Breadcrumb';
 import type { Appointment, AppointmentSearchResult } from '../types';
 import { formatDate, formatTime } from '../utils';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const AppointmentsPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
+
+  // Permission checks
+  const {
+    canViewAppointments,
+    canCreateAppointments,
+    canUpdateAppointments,
+    canCancelAppointments,
+    isAdmin,
+  } = usePermissions();
 
   // State management
   const [page, setPage] = useState(0);
@@ -68,6 +81,7 @@ const AppointmentsPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string>('');
+  const [providerFilter, setProviderFilter] = useState<string>('');
 
   // Query parameters
   const queryParams = useCallback(
@@ -77,8 +91,9 @@ const AppointmentsPage: React.FC = () => {
       search: searchQuery || undefined,
       status: statusFilter || undefined,
       startDate: dateFilter || undefined,
+      providerId: providerFilter || undefined,
     }),
-    [page, rowsPerPage, searchQuery, statusFilter, dateFilter]
+    [page, rowsPerPage, searchQuery, statusFilter, dateFilter, providerFilter]
   );
 
   // Fetch appointments
@@ -92,6 +107,13 @@ const AppointmentsPage: React.FC = () => {
     queryFn: () => appointmentService.getAppointments(queryParams()),
     placeholderData: (previousData: AppointmentSearchResult | undefined) =>
       previousData,
+  });
+
+  // Fetch service providers (only for admin)
+  const { data: serviceProviders } = useQuery({
+    queryKey: ['service-providers'],
+    queryFn: () => staffService.getServiceProviders(),
+    enabled: isAdmin(),
   });
 
   // Cancel appointment mutation
@@ -272,6 +294,24 @@ const AppointmentsPage: React.FC = () => {
   const appointments = appointmentsData?.appointments || [];
   const totalCount = appointmentsData?.total || 0;
 
+  // Check if user has permission to view appointments
+  if (!canViewAppointments()) {
+    return (
+      <Box>
+        <PageHeader
+          title='Appointments'
+          subtitle='Manage patient appointments and scheduling'
+          breadcrumbs={<Breadcrumb />}
+          showActions={false}
+        />
+        <Alert severity='error' sx={{ m: 3 }}>
+          You don't have permission to view appointments. Please contact your
+          administrator.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       {/* Page Header */}
@@ -279,7 +319,7 @@ const AppointmentsPage: React.FC = () => {
         title='Appointments'
         subtitle='Manage patient appointments and scheduling'
         breadcrumbs={<Breadcrumb />}
-        onAdd={handleAddAppointment}
+        onAdd={canCreateAppointments() ? handleAddAppointment : undefined}
         onRefresh={handleRefresh}
         onDownload={handleExport}
         showActions={true}
@@ -325,6 +365,23 @@ const AppointmentsPage: React.FC = () => {
                 <MenuItem value='cancelled'>Cancelled</MenuItem>
               </Select>
             </FormControl>
+            {isAdmin && (
+              <FormControl size='small' sx={{ minWidth: 150 }}>
+                <InputLabel>Provider</InputLabel>
+                <Select
+                  value={providerFilter}
+                  label='Provider'
+                  onChange={(e) => setProviderFilter(e.target.value)}
+                >
+                  <MenuItem value=''>All Providers</MenuItem>
+                  {serviceProviders?.data?.map((provider) => (
+                    <MenuItem key={provider.id} value={provider.id}>
+                      {provider.user.firstName} {provider.user.lastName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <Button
               variant='outlined'
               startIcon={<FilterList />}
@@ -333,6 +390,18 @@ const AppointmentsPage: React.FC = () => {
               }}
             >
               Filter
+            </Button>
+            <Button
+              variant='outlined'
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('');
+                setDateFilter('');
+                setProviderFilter('');
+                setPage(0);
+              }}
+            >
+              Clear Filters
             </Button>
           </Box>
         </Box>
@@ -479,33 +548,41 @@ const AppointmentsPage: React.FC = () => {
           </ListItemIcon>
           View Details
         </MenuItem>
-        <MenuItem onClick={handleEditAppointment}>
-          <ListItemIcon>
-            <Edit fontSize='small' sx={{ mr: 1 }} />
-          </ListItemIcon>
-          Edit Appointment
-        </MenuItem>
-        <MenuItem>
-          <ListItemIcon>
-            <Schedule fontSize='small' sx={{ mr: 1 }} />
-          </ListItemIcon>
-          Reschedule
-        </MenuItem>
-        <MenuItem>
-          <ListItemIcon>
-            <Event fontSize='small' sx={{ mr: 1 }} />
-          </ListItemIcon>
-          Mark Complete
-        </MenuItem>
-        <MenuItem
-          onClick={handleDeleteAppointment}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon>
-            <Delete fontSize='small' sx={{ mr: 1 }} />
-          </ListItemIcon>
-          Cancel Appointment
-        </MenuItem>
+        {canUpdateAppointments() && (
+          <MenuItem onClick={handleEditAppointment}>
+            <ListItemIcon>
+              <Edit fontSize='small' sx={{ mr: 1 }} />
+            </ListItemIcon>
+            Edit Appointment
+          </MenuItem>
+        )}
+        {canUpdateAppointments() && (
+          <MenuItem>
+            <ListItemIcon>
+              <Schedule fontSize='small' sx={{ mr: 1 }} />
+            </ListItemIcon>
+            Reschedule
+          </MenuItem>
+        )}
+        {canUpdateAppointments() && (
+          <MenuItem>
+            <ListItemIcon>
+              <Event fontSize='small' sx={{ mr: 1 }} />
+            </ListItemIcon>
+            Mark Complete
+          </MenuItem>
+        )}
+        {canCancelAppointments() && (
+          <MenuItem
+            onClick={handleDeleteAppointment}
+            sx={{ color: 'error.main' }}
+          >
+            <ListItemIcon>
+              <Delete fontSize='small' sx={{ mr: 1 }} />
+            </ListItemIcon>
+            Cancel Appointment
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Delete Confirmation Dialog */}

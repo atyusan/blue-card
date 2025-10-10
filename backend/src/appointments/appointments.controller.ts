@@ -58,6 +58,8 @@ import {
   GetProviderDateRangeAvailabilityDto,
 } from './dto/query-appointment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/decorators/permissions.decorator';
 import {
   AppointmentResponse,
   AppointmentSearchResult,
@@ -72,7 +74,7 @@ import {
 
 @ApiTags('Appointments')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('appointments')
 export class AppointmentsController {
   constructor(
@@ -89,6 +91,7 @@ export class AppointmentsController {
   // ===== APPOINTMENT OPERATIONS =====
 
   @Post('reschedule')
+  @RequirePermissions(['reschedule_appointments'])
   @ApiOperation({
     summary: 'Reschedule appointment',
     description:
@@ -114,6 +117,7 @@ export class AppointmentsController {
   }
 
   @Post('cancel')
+  @RequirePermissions(['cancel_appointments'])
   @ApiOperation({
     summary: 'Cancel appointment',
     description:
@@ -135,6 +139,7 @@ export class AppointmentsController {
   }
 
   @Post('check-in')
+  @RequirePermissions(['update_appointments'])
   @ApiOperation({
     summary: 'Check in appointment',
     description: 'Marks an appointment as checked in with timestamp recording',
@@ -162,6 +167,7 @@ export class AppointmentsController {
   }
 
   @Post('complete')
+  @RequirePermissions(['update_appointments'])
   @ApiOperation({
     summary: 'Complete appointment',
     description:
@@ -191,6 +197,7 @@ export class AppointmentsController {
   }
 
   @Post('payment')
+  @RequirePermissions(['manage_appointment_payments'])
   @ApiOperation({
     summary: 'Process appointment payment',
     description:
@@ -219,6 +226,7 @@ export class AppointmentsController {
   // ===== INVOICE MANAGEMENT =====
 
   @Get('invoices/:appointmentId')
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Get appointment invoice',
     description: 'Retrieves the invoice associated with a specific appointment',
@@ -239,6 +247,7 @@ export class AppointmentsController {
   }
 
   @Get('invoices')
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Get all appointment invoices',
     description:
@@ -278,6 +287,7 @@ export class AppointmentsController {
   }
 
   @Post('invoices/:appointmentId/regenerate')
+  @RequirePermissions(['manage_appointment_payments'])
   @ApiOperation({
     summary: 'Regenerate appointment invoice',
     description:
@@ -301,6 +311,7 @@ export class AppointmentsController {
   // ===== INTELLIGENT SCHEDULING =====
 
   @Post('slots/search')
+  @RequirePermissions(['view_appointment_slots'])
   @ApiOperation({
     summary: 'Search available appointment slots',
     description:
@@ -318,6 +329,7 @@ export class AppointmentsController {
   }
 
   @Post('slots/recurring')
+  @RequirePermissions(['manage_appointment_slots'])
   @ApiOperation({
     summary: 'Create recurring appointment slots',
     description:
@@ -337,6 +349,7 @@ export class AppointmentsController {
   }
 
   @Post('slots/bulk')
+  @RequirePermissions(['manage_appointment_slots'])
   @ApiOperation({
     summary: 'Create bulk appointment slots',
     description:
@@ -354,6 +367,7 @@ export class AppointmentsController {
   }
 
   @Get('availability/provider')
+  @RequirePermissions(['view_provider_availability'])
   @ApiOperation({
     summary: 'Get provider availability',
     description:
@@ -381,6 +395,7 @@ export class AppointmentsController {
   }
 
   @Get('provider-availability/date-range')
+  @RequirePermissions(['view_provider_availability'])
   @ApiOperation({
     summary: 'Get provider availability across a date range',
     description:
@@ -422,6 +437,7 @@ export class AppointmentsController {
   // ===== STATISTICS & ANALYTICS =====
 
   @Get('statistics/overview')
+  @RequirePermissions(['view_appointment_analytics'])
   @ApiOperation({
     summary: 'Get appointment statistics',
     description:
@@ -438,6 +454,7 @@ export class AppointmentsController {
   // ===== APPOINTMENT SLOTS MANAGEMENT =====
 
   @Post('slots')
+  @RequirePermissions(['manage_appointment_slots'])
   @HttpCode(HttpStatus.CREATED)
   async createAppointmentSlot(
     @Body() createSlotDto: CreateAppointmentSlotDto,
@@ -446,6 +463,7 @@ export class AppointmentsController {
   }
 
   @Get('slots')
+  @RequirePermissions(['view_appointment_slots'])
   async findAllSlots(
     @Query() queryDto: QueryAppointmentSlotDto,
   ): Promise<SlotSearchResult> {
@@ -453,11 +471,13 @@ export class AppointmentsController {
   }
 
   @Get('slots/:id')
+  @RequirePermissions(['view_appointment_slots'])
   async findOneSlot(@Param('id') id: string): Promise<AppointmentSlotResponse> {
     return this.appointmentSlotsService.findOneSlot(id);
   }
 
   @Patch('slots/:id')
+  @RequirePermissions(['manage_appointment_slots'])
   async updateSlot(
     @Param('id') id: string,
     @Body() updateSlotDto: UpdateAppointmentSlotDto,
@@ -466,6 +486,7 @@ export class AppointmentsController {
   }
 
   @Delete('slots/:id')
+  @RequirePermissions(['delete_appointment_slots'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeSlot(@Param('id') id: string): Promise<void> {
     return this.appointmentSlotsService.removeSlot(id);
@@ -474,22 +495,26 @@ export class AppointmentsController {
   // ===== BUNDLE MANAGEMENT =====
 
   @Post('bundles')
+  @RequirePermissions(['manage_appointment_bundles'])
   @HttpCode(HttpStatus.CREATED)
   async createAppointmentBundle(@Body() createBundleDto: any): Promise<any> {
     return this.bundlesService.create(createBundleDto);
   }
 
   @Get('bundles')
+  @RequirePermissions(['view_appointments'])
   async findAllBundles(@Query() queryDto: any): Promise<any> {
     return this.bundlesService.findAll(queryDto);
   }
 
   @Get('bundles/:id')
+  @RequirePermissions(['view_appointments'])
   async findOneBundle(@Param('id') id: string): Promise<any> {
     return this.bundlesService.findOne(id);
   }
 
   @Patch('bundles/:id')
+  @RequirePermissions(['manage_appointment_bundles'])
   async updateBundle(
     @Param('id') id: string,
     @Body() updateBundleDto: any,
@@ -498,6 +523,7 @@ export class AppointmentsController {
   }
 
   @Delete('bundles/:id')
+  @RequirePermissions(['manage_appointment_bundles'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeBundle(@Param('id') id: string): Promise<void> {
     await this.bundlesService.remove(id);
@@ -506,12 +532,14 @@ export class AppointmentsController {
   // ===== WAITLIST MANAGEMENT =====
 
   @Post('waitlist')
+  @RequirePermissions(['manage_appointment_waitlist'])
   @HttpCode(HttpStatus.CREATED)
   async createWaitlistEntry(@Body() createWaitlistDto: any): Promise<any> {
     return this.waitlistService.create(createWaitlistDto);
   }
 
   @Get('waitlist')
+  @RequirePermissions(['manage_appointment_waitlist'])
   async findAllWaitlistEntries(
     @Query() queryDto: QueryWaitlistDto,
   ): Promise<any> {
@@ -519,11 +547,13 @@ export class AppointmentsController {
   }
 
   @Get('waitlist/:id')
+  @RequirePermissions(['manage_appointment_waitlist'])
   async findOneWaitlistEntry(@Param('id') id: string): Promise<any> {
     return this.waitlistService.findOne(id);
   }
 
   @Patch('waitlist/:id')
+  @RequirePermissions(['manage_appointment_waitlist'])
   async updateWaitlistEntry(
     @Param('id') id: string,
     @Body() updateWaitlistDto: any,
@@ -532,6 +562,7 @@ export class AppointmentsController {
   }
 
   @Delete('waitlist/:id')
+  @RequirePermissions(['manage_appointment_waitlist'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeWaitlistEntry(@Param('id') id: string): Promise<void> {
     await this.waitlistService.remove(id);
@@ -540,6 +571,7 @@ export class AppointmentsController {
   // ===== PATIENT PREFERENCES =====
 
   @Post('preferences')
+  @RequirePermissions(['manage_patient_preferences'])
   @HttpCode(HttpStatus.CREATED)
   async createPatientPreference(
     @Body() createPreferenceDto: any,
@@ -548,6 +580,7 @@ export class AppointmentsController {
   }
 
   @Get('preferences/:patientId')
+  @RequirePermissions(['view_appointments'])
   async findPatientPreferences(
     @Param('patientId') patientId: string,
   ): Promise<any> {
@@ -555,6 +588,7 @@ export class AppointmentsController {
   }
 
   @Patch('preferences/:id')
+  @RequirePermissions(['manage_patient_preferences'])
   async updatePatientPreference(
     @Param('id') id: string,
     @Body() updatePreferenceDto: any,
@@ -563,6 +597,7 @@ export class AppointmentsController {
   }
 
   @Delete('preferences/:id')
+  @RequirePermissions(['manage_patient_preferences'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removePatientPreference(@Param('id') id: string): Promise<void> {
     await this.preferencesService.remove(id);
@@ -574,6 +609,7 @@ export class AppointmentsController {
   // ===== PROVIDER SCHEDULE MANAGEMENT =====
 
   @Post('providers/schedules')
+  @RequirePermissions(['manage_provider_schedules'])
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create provider schedule' })
   @ApiResponse({
@@ -587,6 +623,7 @@ export class AppointmentsController {
   }
 
   @Get('providers/schedules')
+  @RequirePermissions(['view_provider_availability'])
   @ApiOperation({ summary: 'Get all provider schedules' })
   @ApiResponse({
     status: 200,
@@ -605,6 +642,7 @@ export class AppointmentsController {
   }
 
   @Get('providers/schedules/:id')
+  @RequirePermissions(['view_provider_availability'])
   @ApiOperation({ summary: 'Get provider schedule by ID' })
   @ApiResponse({
     status: 200,
@@ -617,6 +655,7 @@ export class AppointmentsController {
   }
 
   @Patch('providers/schedules/:id')
+  @RequirePermissions(['manage_provider_schedules'])
   @ApiOperation({ summary: 'Update provider schedule' })
   @ApiResponse({
     status: 200,
@@ -630,6 +669,7 @@ export class AppointmentsController {
   }
 
   @Delete('providers/schedules/:id')
+  @RequirePermissions(['manage_provider_schedules'])
   @ApiOperation({ summary: 'Delete provider schedule' })
   @ApiResponse({
     status: 204,
@@ -643,22 +683,26 @@ export class AppointmentsController {
   // ===== PROVIDER TIME OFF MANAGEMENT =====
 
   @Post('providers/time-off')
+  @RequirePermissions(['manage_provider_time_off'])
   @HttpCode(HttpStatus.CREATED)
   async createProviderTimeOff(@Body() createTimeOffDto: any): Promise<any> {
     return this.providerTimeOffService.create(createTimeOffDto);
   }
 
   @Get('providers/time-off')
+  @RequirePermissions(['view_provider_availability'])
   async findAllProviderTimeOff(@Query() queryDto: any): Promise<any> {
     return this.providerTimeOffService.findAll(queryDto);
   }
 
   @Get('providers/time-off/:id')
+  @RequirePermissions(['view_provider_availability'])
   async findOneProviderTimeOff(@Param('id') id: string): Promise<any> {
     return this.providerTimeOffService.findOne(id);
   }
 
   @Patch('providers/time-off/:id')
+  @RequirePermissions(['manage_provider_time_off'])
   async updateProviderTimeOff(
     @Param('id') id: string,
     @Body() updateTimeOffDto: any,
@@ -667,12 +711,14 @@ export class AppointmentsController {
   }
 
   @Delete('providers/time-off/:id')
+  @RequirePermissions(['manage_provider_time_off'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeProviderTimeOff(@Param('id') id: string): Promise<void> {
     await this.providerTimeOffService.remove(id);
   }
 
   @Post('providers/time-off/:id/approve')
+  @RequirePermissions(['approve_provider_time_off'])
   @ApiOperation({ summary: 'Approve time off request' })
   @ApiResponse({
     status: 200,
@@ -686,6 +732,7 @@ export class AppointmentsController {
   }
 
   @Post('providers/time-off/:id/reject')
+  @RequirePermissions(['approve_provider_time_off'])
   @ApiOperation({ summary: 'Reject time off request' })
   @ApiResponse({
     status: 200,
@@ -701,22 +748,26 @@ export class AppointmentsController {
   // ===== RESOURCE MANAGEMENT =====
 
   @Post('resources')
+  @RequirePermissions(['manage_appointment_resources'])
   @HttpCode(HttpStatus.CREATED)
   async createResource(@Body() createResourceDto: any): Promise<any> {
     return this.resourcesService.createResource(createResourceDto);
   }
 
   @Get('resources')
+  @RequirePermissions(['view_appointments'])
   async findAllResources(@Query() queryDto: QueryResourceDto): Promise<any> {
     return this.resourcesService.findAllResources(queryDto);
   }
 
   @Get('resources/:id')
+  @RequirePermissions(['view_appointments'])
   async findOneResource(@Param('id') id: string): Promise<any> {
     return this.resourcesService.findOneResource(id);
   }
 
   @Patch('resources/:id')
+  @RequirePermissions(['manage_appointment_resources'])
   async updateResource(
     @Param('id') id: string,
     @Body() updateResourceDto: any,
@@ -725,6 +776,7 @@ export class AppointmentsController {
   }
 
   @Delete('resources/:id')
+  @RequirePermissions(['manage_appointment_resources'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeResource(@Param('id') id: string): Promise<void> {
     await this.resourcesService.removeResource(id);
@@ -733,6 +785,7 @@ export class AppointmentsController {
   // ===== RESOURCE SCHEDULE MANAGEMENT =====
 
   @Post('resources/schedules')
+  @RequirePermissions(['manage_appointment_resources'])
   @HttpCode(HttpStatus.CREATED)
   async createResourceSchedule(
     @Body() createResourceScheduleDto: any,
@@ -743,16 +796,19 @@ export class AppointmentsController {
   }
 
   @Get('resources/schedules')
+  @RequirePermissions(['view_appointments'])
   async findAllResourceSchedules(@Query() queryDto: any): Promise<any> {
     return this.resourcesService.findAllResourceSchedules(queryDto);
   }
 
   @Get('resources/schedules/:id')
+  @RequirePermissions(['view_appointments'])
   async findOneResourceSchedule(@Param('id') id: string): Promise<any> {
     return this.resourcesService.findOneResourceSchedule(id);
   }
 
   @Patch('resources/schedules/:id')
+  @RequirePermissions(['manage_appointment_resources'])
   async updateResourceSchedule(
     @Param('id') id: string,
     @Body() updateResourceScheduleDto: any,
@@ -764,6 +820,7 @@ export class AppointmentsController {
   }
 
   @Delete('resources/schedules/:id')
+  @RequirePermissions(['manage_appointment_resources'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeResourceSchedule(@Param('id') id: string): Promise<void> {
     await this.resourcesService.removeResourceSchedule(id);
@@ -772,6 +829,7 @@ export class AppointmentsController {
   // ===== SERVICE PROVIDER MANAGEMENT =====
 
   @Get('providers/:providerId/services')
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Get services available to a provider',
     description:
@@ -797,6 +855,7 @@ export class AppointmentsController {
   }
 
   @Post('providers/:providerId/services/:serviceId/validate')
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Validate provider access to service',
     description:
@@ -830,6 +889,7 @@ export class AppointmentsController {
   // ===== APPOINTMENT MANAGEMENT =====
 
   @Post()
+  @RequirePermissions(['create_appointments'])
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create a new appointment',
@@ -856,6 +916,7 @@ export class AppointmentsController {
   }
 
   @Get()
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Get all appointments',
     description:
@@ -907,6 +968,7 @@ export class AppointmentsController {
   }
 
   @Get(':id')
+  @RequirePermissions(['view_appointments'])
   @ApiOperation({
     summary: 'Get appointment by ID',
     description:
@@ -926,6 +988,7 @@ export class AppointmentsController {
   }
 
   @Patch(':id')
+  @RequirePermissions(['update_appointments'])
   @ApiOperation({
     summary: 'Update appointment',
     description:
@@ -953,6 +1016,7 @@ export class AppointmentsController {
   }
 
   @Delete(':id')
+  @RequirePermissions(['cancel_appointments'])
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete appointment',

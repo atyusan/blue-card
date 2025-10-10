@@ -9,8 +9,6 @@ import {
   Typography,
   Button,
   Chip,
-  Divider,
-  Grid,
   Avatar,
   IconButton,
   Menu,
@@ -23,41 +21,74 @@ import {
   TextField,
   Alert,
   Skeleton,
-  Stack,
   Paper,
   Container,
   Fade,
-  Slide,
   useTheme,
   alpha,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  Tooltip,
 } from '@mui/material';
 import {
   ArrowBack,
   Edit,
   Delete,
   MoreVert,
-  Person,
-  LocalHospital,
-  Receipt,
-  Phone,
-  Email,
-  AccessTime,
   CalendarToday,
   CheckCircle,
   Warning,
   Error,
   Info,
+  Visibility,
+  Link as LinkIcon,
+  LocalHospital,
+  Science,
+  Medication,
 } from '@mui/icons-material';
-import { useAuth } from '../context/AuthContext';
 import appointmentService from '../services/appointment.service';
-import toast from 'react-hot-toast';
+import { treatmentService } from '../services/treatment.service';
+import { useToast } from '@/context/ToastContext';
 import { formatDate, formatCurrency, getInitials } from '@/utils';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/context/AuthContext';
+import type {
+  CreateTreatmentDto,
+  TreatmentType,
+  TreatmentPriority,
+  CreateTreatmentLinkDto,
+  TreatmentLinkType,
+} from '../types';
+import {
+  TreatmentType as TreatmentTypeEnum,
+  TreatmentPriority as TreatmentPriorityEnum,
+  TreatmentLinkType as TreatmentLinkTypeEnum,
+} from '../types';
 
 const AppointmentDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const theme = useTheme();
+  const { staffMember } = useAuth();
+  const { showSuccess, showError } = useToast();
+
+  // Permission checks
+  const {
+    canUpdateAppointments,
+    canCancelAppointments,
+    canCreateTreatments,
+    canViewTreatments,
+    canUpdateTreatments,
+    canDeleteTreatments,
+    canUpdateTreatmentStatus,
+    canManageTreatmentLinks,
+  } = usePermissions();
 
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(
     null
@@ -65,6 +96,42 @@ const AppointmentDetailsPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+
+  // Treatment management state
+  const [createTreatmentDialogOpen, setCreateTreatmentDialogOpen] =
+    useState(false);
+  const [newTreatment, setNewTreatment] = useState<Partial<CreateTreatmentDto>>(
+    {
+      title: '',
+      description: '',
+      treatmentType: TreatmentTypeEnum.CONSULTATION,
+      priority: TreatmentPriorityEnum.ROUTINE,
+      chiefComplaint: '',
+      historyOfPresentIllness: '',
+      pastMedicalHistory: '',
+      allergies: '',
+      medications: '',
+      isEmergency: false,
+    }
+  );
+
+  // Treatment linking state
+  const [linkTreatmentDialogOpen, setLinkTreatmentDialogOpen] = useState(false);
+  const [newTreatmentLink, setNewTreatmentLink] = useState<
+    Partial<CreateTreatmentLinkDto>
+  >({
+    toTreatmentId: '',
+    linkType: TreatmentLinkTypeEnum.FOLLOW_UP,
+    linkReason: '',
+    notes: '',
+  });
+
+  // Treatment table pagination
+  const [treatmentPage, setTreatmentPage] = useState(0);
+  const [treatmentsPerPage, setTreatmentsPerPage] = useState(5);
+  const [treatmentMenuAnchor, setTreatmentMenuAnchor] =
+    useState<null | HTMLElement>(null);
+  const [selectedTreatment, setSelectedTreatment] = useState<any>(null);
 
   // Fetch appointment details
   const {
@@ -77,22 +144,86 @@ const AppointmentDetailsPage: React.FC = () => {
     enabled: !!id,
   });
 
+  // Fetch treatments for this appointment
+  const { data: treatmentsData, isLoading: treatmentsLoading } = useQuery({
+    queryKey: ['treatments', 'appointment', id],
+    queryFn: () =>
+      treatmentService.getTreatments({
+        appointmentId: id,
+      } as any),
+    enabled: !!id,
+  });
+
   // Cancel appointment mutation
   const cancelAppointmentMutation = useMutation({
-    mutationFn: (data: { id: string; reason: string }) =>
-      appointmentService.cancelAppointment(data.id, data.reason),
+    mutationFn: (cancelData: {
+      appointmentId: string;
+      cancellationReason: string;
+    }) => appointmentService.cancelAppointment(cancelData),
     onSuccess: () => {
-      toast.success('Appointment cancelled successfully');
+      showSuccess('Appointment cancelled successfully');
       setCancelDialogOpen(false);
       setCancelReason('');
       queryClient.invalidateQueries({ queryKey: ['appointment', id] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['patient-appointments'] });
     },
-    onError: (error: any) => {
-      toast.error(
+    onError: (error: { response?: { data?: { message?: string } } }) => {
+      showError(
         error.response?.data?.message || 'Failed to cancel appointment'
       );
+    },
+  });
+
+  // Create treatment mutation
+  const createTreatmentMutation = useMutation({
+    mutationFn: (treatmentData: CreateTreatmentDto) =>
+      treatmentService.createTreatment(treatmentData),
+    onSuccess: () => {
+      showSuccess('Treatment created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['treatments'] });
+      queryClient.invalidateQueries({
+        queryKey: ['treatments', 'appointment', id],
+      });
+      setCreateTreatmentDialogOpen(false);
+      setNewTreatment({
+        title: '',
+        description: '',
+        treatmentType: TreatmentTypeEnum.CONSULTATION,
+        priority: TreatmentPriorityEnum.ROUTINE,
+        chiefComplaint: '',
+        historyOfPresentIllness: '',
+        pastMedicalHistory: '',
+        allergies: '',
+        medications: '',
+        isEmergency: false,
+      });
+    },
+    onError: (err) => {
+      showError(`Failed to create treatment: ${err.message}`);
+    },
+  });
+
+  // Create treatment link mutation
+  const createTreatmentLinkMutation = useMutation({
+    mutationFn: (linkData: CreateTreatmentLinkDto) =>
+      treatmentService.createTreatmentLink(linkData),
+    onSuccess: () => {
+      showSuccess('Treatment link created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['treatments'] });
+      queryClient.invalidateQueries({
+        queryKey: ['treatments', 'appointment', id],
+      });
+      setLinkTreatmentDialogOpen(false);
+      setNewTreatmentLink({
+        toTreatmentId: '',
+        linkType: TreatmentLinkTypeEnum.FOLLOW_UP,
+        linkReason: '',
+        notes: '',
+      });
+    },
+    onError: (err) => {
+      showError(`Failed to create treatment link: ${err.message}`);
     },
   });
 
@@ -121,7 +252,118 @@ const AppointmentDetailsPage: React.FC = () => {
 
   const confirmCancelAppointment = () => {
     if (id && cancelReason) {
-      cancelAppointmentMutation.mutate({ id, reason: cancelReason });
+      cancelAppointmentMutation.mutate({
+        appointmentId: id,
+        cancellationReason: cancelReason,
+      });
+    }
+  };
+
+  const handleCreateTreatment = () => {
+    if (appointment && newTreatment.title) {
+      // Use logged-in user's staff member as primary provider
+      // Fallback to appointment slot provider or appointment provider if logged-in user is not a staff member
+      const primaryProviderId =
+        staffMember?.id ||
+        appointment.slot?.provider?.id ||
+        appointment.providerId ||
+        '';
+
+      if (!primaryProviderId) {
+        showError(
+          'Unable to determine primary provider. Please ensure you are logged in as a staff member.'
+        );
+        return;
+      }
+
+      const treatmentData: CreateTreatmentDto = {
+        patientId: appointment.patientId,
+        primaryProviderId,
+        appointmentId: appointment.id,
+        title: newTreatment.title,
+        description: newTreatment.description,
+        treatmentType:
+          newTreatment.treatmentType || TreatmentTypeEnum.CONSULTATION,
+        priority: newTreatment.priority,
+        chiefComplaint: newTreatment.chiefComplaint,
+        historyOfPresentIllness: newTreatment.historyOfPresentIllness,
+        pastMedicalHistory: newTreatment.pastMedicalHistory,
+        allergies: newTreatment.allergies,
+        medications: newTreatment.medications,
+        isEmergency: newTreatment.isEmergency || false,
+      };
+      createTreatmentMutation.mutate(treatmentData);
+    }
+  };
+
+  const handleCreateTreatmentLink = (fromTreatmentId: string) => {
+    if (newTreatmentLink.toTreatmentId && newTreatmentLink.linkType) {
+      const linkData: CreateTreatmentLinkDto = {
+        fromTreatmentId,
+        toTreatmentId: newTreatmentLink.toTreatmentId,
+        linkType: newTreatmentLink.linkType,
+        linkReason: newTreatmentLink.linkReason,
+        notes: newTreatmentLink.notes,
+      };
+      createTreatmentLinkMutation.mutate(linkData);
+    }
+  };
+
+  // Treatment table handlers
+  const handleTreatmentMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    treatment: any
+  ) => {
+    setSelectedTreatment(treatment);
+    setTreatmentMenuAnchor(event.currentTarget);
+  };
+
+  const handleTreatmentMenuClose = () => {
+    setTreatmentMenuAnchor(null);
+    setSelectedTreatment(null);
+  };
+
+  const handleViewTreatmentDetails = () => {
+    if (selectedTreatment) {
+      navigate(`/treatments/${selectedTreatment.id}`);
+    }
+    handleTreatmentMenuClose();
+  };
+
+  const handleLinkTreatment = () => {
+    if (selectedTreatment) {
+      setNewTreatmentLink((prev) => ({
+        ...prev,
+        toTreatmentId: selectedTreatment.id,
+      }));
+      setLinkTreatmentDialogOpen(true);
+    }
+    handleTreatmentMenuClose();
+  };
+
+  const handleTreatmentPageChange = (_event: unknown, newPage: number) => {
+    setTreatmentPage(newPage);
+  };
+
+  const handleTreatmentsPerPageChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setTreatmentsPerPage(parseInt(event.target.value, 10));
+    setTreatmentPage(0);
+  };
+
+  const getTreatmentStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'success';
+      case 'COMPLETED':
+        return 'info';
+      case 'CANCELLED':
+        return 'error';
+      case 'SUSPENDED':
+        return 'warning';
+      default:
+        return 'default';
     }
   };
 
@@ -184,6 +426,25 @@ const AppointmentDetailsPage: React.FC = () => {
         <Skeleton variant='rectangular' height={200} />
         <Skeleton variant='rectangular' height={200} sx={{ mt: 2 }} />
       </Box>
+    );
+  }
+
+  // Check if user has permission to view appointments
+  if (!canViewTreatments() && !canUpdateAppointments()) {
+    return (
+      <Container maxWidth='xl' sx={{ py: 3 }}>
+        <Alert severity='error'>
+          You don't have permission to view this page. Please contact your
+          administrator.
+        </Alert>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate('/appointments')}
+          sx={{ mt: 2 }}
+        >
+          Back to Appointments
+        </Button>
+      </Container>
     );
   }
 
@@ -294,7 +555,16 @@ const AppointmentDetailsPage: React.FC = () => {
                 <Chip
                   icon={getStatusIcon(appointment.status)}
                   label={appointment.status}
-                  color={getStatusColor(appointment.status) as any}
+                  color={
+                    getStatusColor(appointment.status) as
+                      | 'success'
+                      | 'warning'
+                      | 'error'
+                      | 'info'
+                      | 'primary'
+                      | 'secondary'
+                      | 'default'
+                  }
                   sx={{
                     bgcolor: alpha('#fff', 0.2),
                     color: 'white',
@@ -304,18 +574,20 @@ const AppointmentDetailsPage: React.FC = () => {
                     },
                   }}
                 />
-                <IconButton
-                  onClick={handleActionMenuOpen}
-                  sx={{
-                    color: 'white',
-                    bgcolor: alpha('#fff', 0.1),
-                    '&:hover': {
-                      bgcolor: alpha('#fff', 0.2),
-                    },
-                  }}
-                >
-                  <MoreVert />
-                </IconButton>
+                {(canUpdateAppointments() || canCancelAppointments()) && (
+                  <IconButton
+                    onClick={handleActionMenuOpen}
+                    sx={{
+                      color: 'white',
+                      bgcolor: alpha('#fff', 0.1),
+                      '&:hover': {
+                        bgcolor: alpha('#fff', 0.2),
+                      },
+                    }}
+                  >
+                    <MoreVert />
+                  </IconButton>
+                )}
               </Box>
             </Box>
           </Box>
@@ -328,13 +600,15 @@ const AppointmentDetailsPage: React.FC = () => {
         open={Boolean(actionMenuAnchor)}
         onClose={handleActionMenuClose}
       >
-        <MenuItem onClick={handleEditAppointment}>
-          <ListItemIcon>
-            <Edit fontSize='small' />
-          </ListItemIcon>
-          Edit Appointment
-        </MenuItem>
-        {appointment.status !== 'CANCELLED' && (
+        {canUpdateAppointments() && (
+          <MenuItem onClick={handleEditAppointment}>
+            <ListItemIcon>
+              <Edit fontSize='small' />
+            </ListItemIcon>
+            Edit Appointment
+          </MenuItem>
+        )}
+        {canCancelAppointments() && appointment.status !== 'CANCELLED' && (
           <MenuItem onClick={handleCancelAppointment}>
             <ListItemIcon>
               <Warning fontSize='small' />
@@ -342,15 +616,17 @@ const AppointmentDetailsPage: React.FC = () => {
             Cancel Appointment
           </MenuItem>
         )}
-        <MenuItem
-          onClick={handleDeleteAppointment}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon>
-            <Delete fontSize='small' />
-          </ListItemIcon>
-          Delete Appointment
-        </MenuItem>
+        {canCancelAppointments() && (
+          <MenuItem
+            onClick={handleDeleteAppointment}
+            sx={{ color: 'error.main' }}
+          >
+            <ListItemIcon>
+              <Delete fontSize='small' />
+            </ListItemIcon>
+            Delete Appointment
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Simple Layout */}
@@ -362,8 +638,9 @@ const AppointmentDetailsPage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
               <Avatar sx={{ bgcolor: 'primary.main' }}>
                 {getInitials(
-                  appointment.patient?.firstName,
-                  appointment.patient?.lastName
+                  `${appointment.patient?.firstName || ''} ${
+                    appointment.patient?.lastName || ''
+                  }`
                 )}
               </Avatar>
               <Box>
@@ -397,18 +674,19 @@ const AppointmentDetailsPage: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Avatar sx={{ bgcolor: 'success.main' }}>
                   {getInitials(
-                    (appointment.slot.provider as any).firstName,
-                    (appointment.slot.provider as any).lastName
+                    `${appointment.slot.provider.user.firstName || ''} ${
+                      appointment.slot.provider.user.lastName || ''
+                    }`
                   )}
                 </Avatar>
                 <Box>
                   <Typography variant='h6'>
-                    {(appointment.slot.provider as any).firstName}{' '}
-                    {(appointment.slot.provider as any).lastName}
+                    {appointment.slot.provider.user.firstName}{' '}
+                    {appointment.slot.provider.user.lastName}
                   </Typography>
-                  {(appointment.slot.provider as any).specialization && (
+                  {appointment.slot.provider.specialization && (
                     <Typography variant='body2' color='text.secondary'>
-                      {(appointment.slot.provider as any).specialization}
+                      {appointment.slot.provider.specialization}
                     </Typography>
                   )}
                 </Box>
@@ -421,8 +699,14 @@ const AppointmentDetailsPage: React.FC = () => {
         <Card>
           <CardHeader title='Appointment Information' />
           <CardContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: 2,
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Scheduled Time
                 </Typography>
@@ -436,9 +720,9 @@ const AppointmentDetailsPage: React.FC = () => {
                     hour12: true,
                   })}
                 </Typography>
-              </Grid>
+              </Box>
               {appointment.scheduledEnd && (
-                <Grid item xs={12} sm={6}>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' color='text.secondary'>
                     End Time
                   </Typography>
@@ -453,39 +737,48 @@ const AppointmentDetailsPage: React.FC = () => {
                       }
                     )}
                   </Typography>
-                </Grid>
+                </Box>
               )}
-              <Grid item xs={12} sm={6}>
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Appointment Type
                 </Typography>
                 <Typography variant='body1'>
                   {appointment.appointmentType?.replace(/_/g, ' ')}
                 </Typography>
-              </Grid>
+              </Box>
               {appointment.slot?.duration && (
-                <Grid item xs={12} sm={6}>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' color='text.secondary'>
                     Duration
                   </Typography>
                   <Typography variant='body1'>
                     {appointment.slot.duration} minutes
                   </Typography>
-                </Grid>
+                </Box>
               )}
               {appointment.priority && (
-                <Grid item xs={12}>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' color='text.secondary'>
                     Priority
                   </Typography>
                   <Chip
                     label={appointment.priority}
-                    color={getPriorityColor(appointment.priority) as any}
+                    color={
+                      getPriorityColor(appointment.priority) as
+                        | 'success'
+                        | 'warning'
+                        | 'error'
+                        | 'info'
+                        | 'primary'
+                        | 'secondary'
+                        | 'default'
+                    }
                     size='small'
                   />
-                </Grid>
+                </Box>
               )}
-            </Grid>
+            </Box>
           </CardContent>
         </Card>
 
@@ -493,24 +786,30 @@ const AppointmentDetailsPage: React.FC = () => {
         <Card>
           <CardHeader title='Billing Information' />
           <CardContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: 2,
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Total Amount
                 </Typography>
                 <Typography variant='h6' color='primary.main'>
                   {formatCurrency(appointment.totalAmount || 0)}
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Paid Amount
                 </Typography>
                 <Typography variant='h6' color='success.main'>
                   {formatCurrency(appointment.paidAmount || 0)}
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Balance
                 </Typography>
@@ -524,8 +823,8 @@ const AppointmentDetailsPage: React.FC = () => {
                 >
                   {formatCurrency(appointment.balance || 0)}
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: 1 }}>
                 <Typography variant='body2' color='text.secondary'>
                   Payment Status
                 </Typography>
@@ -534,8 +833,8 @@ const AppointmentDetailsPage: React.FC = () => {
                   color={appointment.isPaid ? 'success' : 'warning'}
                   size='small'
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
 
@@ -585,7 +884,496 @@ const AppointmentDetailsPage: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Treatment Management Section */}
+        {canViewTreatments() &&
+          appointment &&
+          appointment.status !== 'CANCELLED' && (
+            <Card>
+              <CardHeader
+                title='Treatment Management'
+                action={
+                  canCreateTreatments() && (
+                    <Button
+                      variant='contained'
+                      onClick={() => setCreateTreatmentDialogOpen(true)}
+                      disabled={treatmentsLoading}
+                    >
+                      Start Treatment
+                    </Button>
+                  )
+                }
+              />
+              <CardContent>
+                {treatmentsLoading ? (
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'center', py: 3 }}
+                  >
+                    <Typography color='text.secondary'>
+                      Loading treatments...
+                    </Typography>
+                  </Box>
+                ) : treatmentsData?.treatments &&
+                  treatmentsData.treatments.length > 0 ? (
+                  <>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Title</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell>Priority</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Provider</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align='right'>Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {treatmentsData.treatments
+                            .slice(
+                              treatmentPage * treatmentsPerPage,
+                              treatmentPage * treatmentsPerPage +
+                                treatmentsPerPage
+                            )
+                            .map((treatment) => (
+                              <TableRow key={treatment.id} hover>
+                                <TableCell>
+                                  <Typography variant='body2' fontWeight={500}>
+                                    {treatment.title}
+                                  </Typography>
+                                  {treatment.description && (
+                                    <Typography
+                                      variant='caption'
+                                      color='text.secondary'
+                                      sx={{
+                                        display: 'block',
+                                        mt: 0.5,
+                                        maxWidth: 300,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {treatment.description}
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={treatment.treatmentType}
+                                    size='small'
+                                    variant='outlined'
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={treatment.priority}
+                                    size='small'
+                                    color={
+                                      getPriorityColor(
+                                        treatment.priority
+                                      ) as any
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={treatment.status}
+                                    size='small'
+                                    color={
+                                      getTreatmentStatusColor(
+                                        treatment.status
+                                      ) as any
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant='body2'>
+                                    {treatment.primaryProvider?.firstName}{' '}
+                                    {treatment.primaryProvider?.lastName}
+                                  </Typography>
+                                  {treatment.primaryProvider
+                                    ?.specialization && (
+                                    <Typography
+                                      variant='caption'
+                                      color='text.secondary'
+                                    >
+                                      {treatment.primaryProvider.specialization}
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant='body2'>
+                                    {formatDate(treatment.createdAt)}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell align='right'>
+                                  <Tooltip title='Actions'>
+                                    <IconButton
+                                      size='small'
+                                      onClick={(e) =>
+                                        handleTreatmentMenuOpen(e, treatment)
+                                      }
+                                    >
+                                      <MoreVert fontSize='small' />
+                                    </IconButton>
+                                  </Tooltip>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    <TablePagination
+                      component='div'
+                      count={treatmentsData.treatments.length}
+                      page={treatmentPage}
+                      onPageChange={handleTreatmentPageChange}
+                      rowsPerPage={treatmentsPerPage}
+                      onRowsPerPageChange={handleTreatmentsPerPageChange}
+                      rowsPerPageOptions={[5, 10, 25]}
+                    />
+                  </>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <Typography color='text.secondary' sx={{ mb: 2 }}>
+                      No treatments have been started for this appointment.
+                    </Typography>
+                    {canCreateTreatments() && (
+                      <Button
+                        variant='contained'
+                        onClick={() => setCreateTreatmentDialogOpen(true)}
+                      >
+                        Start First Treatment
+                      </Button>
+                    )}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          )}
       </Box>
+
+      {/* Treatment Actions Menu */}
+      <Menu
+        anchorEl={treatmentMenuAnchor}
+        open={Boolean(treatmentMenuAnchor)}
+        onClose={handleTreatmentMenuClose}
+      >
+        <MenuItem onClick={handleViewTreatmentDetails}>
+          <ListItemIcon>
+            <Visibility fontSize='small' />
+          </ListItemIcon>
+          View Details
+        </MenuItem>
+        {canUpdateTreatments() && (
+          <>
+            <MenuItem>
+              <ListItemIcon>
+                <LocalHospital fontSize='small' />
+              </ListItemIcon>
+              Add Diagnosis
+            </MenuItem>
+            <MenuItem>
+              <ListItemIcon>
+                <Medication fontSize='small' />
+              </ListItemIcon>
+              Prescribe Medication
+            </MenuItem>
+            <MenuItem>
+              <ListItemIcon>
+                <Science fontSize='small' />
+              </ListItemIcon>
+              Request Lab Test
+            </MenuItem>
+          </>
+        )}
+        {canManageTreatmentLinks() && (
+          <MenuItem onClick={handleLinkTreatment}>
+            <ListItemIcon>
+              <LinkIcon fontSize='small' />
+            </ListItemIcon>
+            Link Treatment
+          </MenuItem>
+        )}
+        {canUpdateTreatmentStatus() && (
+          <>
+            <MenuItem divider />
+            <MenuItem>
+              <ListItemIcon>
+                <CheckCircle fontSize='small' color='success' />
+              </ListItemIcon>
+              Mark Complete
+            </MenuItem>
+            <MenuItem>
+              <ListItemIcon>
+                <Warning fontSize='small' color='warning' />
+              </ListItemIcon>
+              Put On Hold
+            </MenuItem>
+          </>
+        )}
+        {canDeleteTreatments() && (
+          <MenuItem sx={{ color: 'error.main' }}>
+            <ListItemIcon>
+              <Delete fontSize='small' color='error' />
+            </ListItemIcon>
+            Delete Treatment
+          </MenuItem>
+        )}
+      </Menu>
+
+      {/* Create Treatment Dialog */}
+      <Dialog
+        open={createTreatmentDialogOpen}
+        onClose={() => setCreateTreatmentDialogOpen(false)}
+        maxWidth='md'
+        fullWidth
+      >
+        <DialogTitle>Start New Treatment</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label='Treatment Title'
+              fullWidth
+              value={newTreatment.title}
+              onChange={(e) =>
+                setNewTreatment((prev) => ({ ...prev, title: e.target.value }))
+              }
+              required
+            />
+            <TextField
+              label='Description'
+              fullWidth
+              multiline
+              rows={3}
+              value={newTreatment.description}
+              onChange={(e) =>
+                setNewTreatment((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label='Chief Complaint'
+                fullWidth
+                value={newTreatment.chiefComplaint}
+                onChange={(e) =>
+                  setNewTreatment((prev) => ({
+                    ...prev,
+                    chiefComplaint: e.target.value,
+                  }))
+                }
+              />
+              <TextField
+                label='Treatment Type'
+                select
+                fullWidth
+                value={newTreatment.treatmentType}
+                onChange={(e) =>
+                  setNewTreatment((prev) => ({
+                    ...prev,
+                    treatmentType: e.target.value as TreatmentType,
+                  }))
+                }
+                SelectProps={{ native: true }}
+              >
+                <option value='CONSULTATION'>Consultation</option>
+                <option value='FOLLOW_UP'>Follow-up</option>
+                <option value='EMERGENCY'>Emergency</option>
+                <option value='SURGERY'>Surgery</option>
+                <option value='THERAPY'>Therapy</option>
+                <option value='REHABILITATION'>Rehabilitation</option>
+                <option value='PREVENTIVE'>Preventive</option>
+                <option value='DIAGNOSTIC'>Diagnostic</option>
+              </TextField>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label='Priority'
+                select
+                fullWidth
+                value={newTreatment.priority}
+                onChange={(e) =>
+                  setNewTreatment((prev) => ({
+                    ...prev,
+                    priority: e.target.value as TreatmentPriority,
+                  }))
+                }
+                SelectProps={{ native: true }}
+              >
+                <option value='ROUTINE'>Routine</option>
+                <option value='URGENT'>Urgent</option>
+                <option value='EMERGENCY'>Emergency</option>
+                <option value='FOLLOW_UP'>Follow-up</option>
+              </TextField>
+              <TextField
+                label='Allergies'
+                fullWidth
+                value={newTreatment.allergies}
+                onChange={(e) =>
+                  setNewTreatment((prev) => ({
+                    ...prev,
+                    allergies: e.target.value,
+                  }))
+                }
+                placeholder='Known allergies'
+              />
+            </Box>
+            <TextField
+              label='Current Medications'
+              fullWidth
+              value={newTreatment.medications}
+              onChange={(e) =>
+                setNewTreatment((prev) => ({
+                  ...prev,
+                  medications: e.target.value,
+                }))
+              }
+              placeholder='Current medications'
+            />
+            <TextField
+              label='History of Present Illness'
+              fullWidth
+              multiline
+              rows={3}
+              value={newTreatment.historyOfPresentIllness}
+              onChange={(e) =>
+                setNewTreatment((prev) => ({
+                  ...prev,
+                  historyOfPresentIllness: e.target.value,
+                }))
+              }
+            />
+            <TextField
+              label='Past Medical History'
+              fullWidth
+              multiline
+              rows={2}
+              value={newTreatment.pastMedicalHistory}
+              onChange={(e) =>
+                setNewTreatment((prev) => ({
+                  ...prev,
+                  pastMedicalHistory: e.target.value,
+                }))
+              }
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateTreatmentDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateTreatment}
+            variant='contained'
+            disabled={!newTreatment.title || createTreatmentMutation.isPending}
+          >
+            {createTreatmentMutation.isPending
+              ? 'Creating...'
+              : 'Start Treatment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Treatment Link Dialog */}
+      <Dialog
+        open={linkTreatmentDialogOpen}
+        onClose={() => setLinkTreatmentDialogOpen(false)}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>Link Treatment</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label='Link Type'
+              select
+              fullWidth
+              value={newTreatmentLink.linkType}
+              onChange={(e) =>
+                setNewTreatmentLink((prev) => ({
+                  ...prev,
+                  linkType: e.target.value as TreatmentLinkType,
+                }))
+              }
+              SelectProps={{ native: true }}
+            >
+              <option value={TreatmentLinkTypeEnum.FOLLOW_UP}>Follow-up</option>
+              <option value={TreatmentLinkTypeEnum.ESCALATION}>
+                Escalation
+              </option>
+              <option value={TreatmentLinkTypeEnum.REFERRAL}>Referral</option>
+              <option value={TreatmentLinkTypeEnum.CONTINUATION}>
+                Continuation
+              </option>
+              <option value={TreatmentLinkTypeEnum.PREPROCEDURE}>
+                Pre-procedure
+              </option>
+              <option value={TreatmentLinkTypeEnum.POSTPROCEDURE}>
+                Post-procedure
+              </option>
+              <option value={TreatmentLinkTypeEnum.SERIES}>Series</option>
+              <option value={TreatmentLinkTypeEnum.PARALLEL}>Parallel</option>
+              <option value={TreatmentLinkTypeEnum.REPLACEMENT}>
+                Replacement
+              </option>
+              <option value={TreatmentLinkTypeEnum.CANCELLATION}>
+                Cancellation
+              </option>
+            </TextField>
+            <TextField
+              label='Link Reason'
+              fullWidth
+              value={newTreatmentLink.linkReason}
+              onChange={(e) =>
+                setNewTreatmentLink((prev) => ({
+                  ...prev,
+                  linkReason: e.target.value,
+                }))
+              }
+              placeholder='Reason for linking treatments'
+            />
+            <TextField
+              label='Notes'
+              fullWidth
+              multiline
+              rows={3}
+              value={newTreatmentLink.notes}
+              onChange={(e) =>
+                setNewTreatmentLink((prev) => ({
+                  ...prev,
+                  notes: e.target.value,
+                }))
+              }
+              placeholder='Additional notes about the link'
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinkTreatmentDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() =>
+              handleCreateTreatmentLink(newTreatmentLink.toTreatmentId || '')
+            }
+            variant='contained'
+            disabled={
+              !newTreatmentLink.toTreatmentId ||
+              !newTreatmentLink.linkType ||
+              createTreatmentLinkMutation.isPending
+            }
+          >
+            {createTreatmentLinkMutation.isPending
+              ? 'Linking...'
+              : 'Create Link'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Enhanced Cancel Appointment Dialog */}
       <Dialog

@@ -21,6 +21,8 @@ import { RolesPage } from './pages/RolesPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import AppointmentDetailsPage from './pages/AppointmentDetailsPage';
 import CreateAppointmentPage from './pages/CreateAppointmentPage';
+import TreatmentsPage from './pages/TreatmentsPage';
+import TreatmentDetailsPage from './pages/TreatmentDetailsPage';
 import ProviderAvailabilityPage from './pages/ProviderAvailabilityPage';
 import TimeOffManagementPage from './pages/TimeOffManagementPage';
 import BillingPage from './pages/BillingPage';
@@ -187,6 +189,25 @@ const AppRoutes: React.FC = () => {
           element={
             <PermissionGuard permissions={['edit_appointments']}>
               <CreateAppointmentPage />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Treatments Routes */}
+        <Route
+          path='treatments'
+          element={
+            <PermissionGuard permissions={['view_treatments']}>
+              <TreatmentsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='treatments/:id'
+          element={
+            <PermissionGuard permissions={['view_treatments']}>
+              <TreatmentDetailsPage />
             </PermissionGuard>
           }
         />

@@ -28,6 +28,24 @@ export class AuthService {
     // Get user permissions from roles
     const userPermissions = await this.getUserPermissions(user.id);
 
+    // Get staff member information
+    const staffMember = await this.prisma.staffMember.findFirst({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        employeeId: true,
+        departmentId: true,
+        specialization: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
     const payload = {
       username: user.username,
       sub: user.id,
@@ -45,6 +63,7 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         permissions: userPermissions,
+        staffMember: staffMember,
       },
     };
   }

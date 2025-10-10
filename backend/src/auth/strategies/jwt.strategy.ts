@@ -62,15 +62,53 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    // Get user with permissions
+    // Get user's direct permissions
     const userWithPermissions = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { permissions: true },
     });
 
-    // Get user permissions (aggregated from roles + direct permissions)
-    const userPermissions =
-      (userWithPermissions?.permissions as string[]) || [];
+    // Get user's role-based permissions if they are a staff member
+    let rolePermissions: string[] = [];
+    if (staffMember) {
+      const staffRoleAssignments =
+        await this.prisma.staffRoleAssignment.findMany({
+          where: {
+            staffMemberId: staffMember.id,
+            isActive: true,
+          },
+          include: {
+            role: {
+              select: {
+                permissions: true,
+                isActive: true,
+              },
+            },
+          },
+        });
+
+      // Aggregate permissions from all active roles
+      rolePermissions = staffRoleAssignments
+        .filter((assignment) => assignment.role.isActive)
+        .flatMap((assignment) => {
+          const permissions = assignment.role.permissions;
+          if (Array.isArray(permissions)) {
+            return permissions.filter(
+              (p): p is string => typeof p === 'string',
+            );
+          }
+          return [];
+        });
+    }
+
+    // Combine direct user permissions and role-based permissions (remove duplicates)
+    const directPermissions = Array.isArray(userWithPermissions?.permissions)
+      ? (userWithPermissions.permissions as string[])
+      : [];
+
+    const allPermissions = [
+      ...new Set([...directPermissions, ...rolePermissions]),
+    ];
 
     return {
       id: user.id,
@@ -81,7 +119,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isActive: user.isActive,
       staffMemberId: staffMember?.id,
       staffMember: staffMember,
-      permissions: userPermissions,
+      permissions: allPermissions,
     };
   }
 }

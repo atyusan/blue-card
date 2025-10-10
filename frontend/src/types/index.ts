@@ -582,3 +582,542 @@ export interface SortOption {
   field: string;
   direction: 'asc' | 'desc';
 }
+
+// Treatment System Types
+export interface Treatment {
+  id: string;
+  patientId: string;
+  primaryProviderId: string;
+  appointmentId?: string;
+  title: string;
+  description?: string;
+  treatmentType: TreatmentType;
+  status: TreatmentStatus;
+  priority: TreatmentPriority;
+  startDate: string;
+  endDate?: string;
+  lastUpdated: string;
+  chiefComplaint?: string;
+  historyOfPresentIllness?: string;
+  pastMedicalHistory?: string;
+  allergies?: string;
+  medications?: string;
+  isEmergency: boolean;
+  emergencyLevel?: EmergencyLevel;
+  createdAt: string;
+  updatedAt: string;
+  patient?: Patient;
+  primaryProvider: TreatmentProvider;
+  appointment?: Appointment;
+  providers: TreatmentProviderRole[];
+  diagnoses: Diagnosis[];
+  prescriptions: Prescription[];
+  labRequests: LabRequest[];
+  imagingRequests: ImagingRequest[];
+  procedures: Procedure[];
+  admissions: Admission[];
+  referrals: Referral[];
+  notes: TreatmentNote[];
+
+  // Treatment Links
+  linkedFromTreatments: TreatmentLink[];
+  linkedToTreatments: TreatmentLink[];
+}
+
+export interface TreatmentProviderRole {
+  id: string;
+  providerId: string;
+  role: ProviderRole;
+  isActive: boolean;
+  joinedAt: string;
+  leftAt?: string;
+  transferAcknowledged: boolean;
+  transferAcknowledgedAt?: string;
+  provider: TreatmentProvider;
+}
+
+export interface TreatmentProvider {
+  id: string;
+  firstName: string;
+  lastName: string;
+  specialization?: string;
+  licenseNumber?: string;
+}
+
+export interface Diagnosis {
+  id: string;
+  diagnosisCode?: string;
+  diagnosisName: string;
+  description?: string;
+  status: DiagnosisStatus;
+  isPrimary: boolean;
+  diagnosedAt: string;
+  provider: TreatmentProvider;
+}
+
+export interface PrescriptionMedication {
+  id: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+  quantity: number;
+  totalPrice: number;
+  unitPrice: number;
+  isPaid: boolean;
+  medication: {
+    id: string;
+    name: string;
+    genericName?: string;
+    manufacturer?: string;
+  };
+  dispensedItems: any[]; // Can be expanded later
+}
+
+export interface Prescription {
+  id: string;
+  patientId: string;
+  treatmentId?: string;
+  prescriptionDate: string;
+  status: PrescriptionStatus;
+  isPaid: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  balance: number;
+  paidAmount: number;
+  totalAmount: number;
+  medications: PrescriptionMedication[];
+  doctor: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    specialization?: string;
+    licenseNumber?: string;
+  };
+  patient: {
+    id: string;
+    patientId?: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export interface LabRequest {
+  id: string;
+  testType: string;
+  testName: string;
+  description?: string;
+  urgency: LabUrgency;
+  status: LabRequestStatus;
+  requestedAt: string;
+  scheduledAt?: string;
+  completedAt?: string;
+  specimenType?: string;
+  collectionInstructions?: string;
+  requestingProvider: TreatmentProvider;
+  labProvider?: TreatmentProvider;
+  results: LabResult[];
+}
+
+export interface LabResult {
+  id: string;
+  resultType: string;
+  resultValue?: string;
+  normalRange?: string;
+  unit?: string;
+  status: LabResultStatus;
+  notes?: string;
+  completedAt?: string;
+  reviewedAt?: string;
+}
+
+export interface ImagingRequest {
+  id: string;
+  imagingType: ImagingType;
+  bodyPart: string;
+  description?: string;
+  urgency: ImagingUrgency;
+  status: ImagingRequestStatus;
+  requestedAt: string;
+  scheduledAt?: string;
+  completedAt?: string;
+  contrastRequired: boolean;
+  preparationInstructions?: string;
+  requestingProvider: TreatmentProvider;
+  imagingProvider?: TreatmentProvider;
+  results: ImagingResult[];
+}
+
+export interface ImagingResult {
+  id: string;
+  finding?: string;
+  impression?: string;
+  recommendation?: string;
+  status: ImagingResultStatus;
+  completedAt?: string;
+  reviewedAt?: string;
+  imageUrls: string[];
+}
+
+export interface Procedure {
+  id: string;
+  procedureName: string;
+  procedureCode?: string;
+  description?: string;
+  status: ProcedureStatus;
+  scheduledAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  duration?: number;
+  anesthesia?: string;
+  complications?: string;
+  notes?: string;
+  provider: TreatmentProvider;
+}
+
+export interface Admission {
+  id: string;
+  wardId?: string;
+  bedNumber?: string;
+  admissionType: AdmissionType;
+  status: AdmissionStatus;
+  admittedAt: string;
+  dischargedAt?: string;
+  dischargeNotes?: string;
+  ward?: Ward;
+}
+
+export interface Ward {
+  id: string;
+  name: string;
+  wardType: WardType;
+  capacity: number;
+  currentOccupancy: number;
+  isActive: boolean;
+}
+
+export interface Referral {
+  id: string;
+  referralType: ReferralType;
+  reason: string;
+  urgency: ReferralUrgency;
+  status: ReferralStatus;
+  referredAt: string;
+  acceptedAt?: string;
+  completedAt?: string;
+  notes?: string;
+  fromProvider: TreatmentProvider;
+  toProvider?: TreatmentProvider;
+  toDepartment?: Department;
+}
+
+export interface TreatmentNote {
+  id: string;
+  noteType: NoteType;
+  content: string;
+  isPrivate: boolean;
+  createdAt: string;
+  provider: TreatmentProvider;
+}
+
+export interface TreatmentSummary {
+  id: string;
+  title: string;
+  treatmentType: TreatmentType;
+  status: TreatmentStatus;
+  priority: TreatmentPriority;
+  startDate: string;
+  endDate?: string;
+  primaryProvider: TreatmentProvider;
+  appointment?: {
+    id: string;
+    scheduledStart: string;
+    status: string;
+  };
+  diagnosisCount: number;
+  prescriptionCount: number;
+  isEmergency: boolean;
+}
+
+export interface TreatmentLink {
+  id: string;
+  fromTreatmentId: string;
+  toTreatmentId: string;
+  linkType: TreatmentLinkType;
+  linkReason?: string;
+  isActive: boolean;
+  createdAt: string;
+  notes?: string;
+  fromTreatment: {
+    id: string;
+    title: string;
+    treatmentType: TreatmentType;
+    status: TreatmentStatus;
+    startDate: string;
+    primaryProvider: TreatmentProvider;
+  };
+  toTreatment: {
+    id: string;
+    title: string;
+    treatmentType: TreatmentType;
+    status: TreatmentStatus;
+    startDate: string;
+    primaryProvider: TreatmentProvider;
+  };
+  creator: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+// Treatment Enums
+export enum TreatmentType {
+  CONSULTATION = 'CONSULTATION',
+  FOLLOW_UP = 'FOLLOW_UP',
+  EMERGENCY = 'EMERGENCY',
+  SURGERY = 'SURGERY',
+  THERAPY = 'THERAPY',
+  REHABILITATION = 'REHABILITATION',
+  PREVENTIVE = 'PREVENTIVE',
+  DIAGNOSTIC = 'DIAGNOSTIC',
+}
+
+export enum TreatmentStatus {
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  COMPLETED = 'COMPLETED',
+  TRANSFERRED = 'TRANSFERRED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TreatmentPriority {
+  EMERGENCY = 'EMERGENCY',
+  URGENT = 'URGENT',
+  ROUTINE = 'ROUTINE',
+  FOLLOW_UP = 'FOLLOW_UP',
+}
+
+export enum EmergencyLevel {
+  CRITICAL = 'CRITICAL',
+  HIGH = 'HIGH',
+  MODERATE = 'MODERATE',
+  LOW = 'LOW',
+}
+
+export enum ProviderRole {
+  PRIMARY = 'PRIMARY',
+  CONSULTANT = 'CONSULTANT',
+  SPECIALIST = 'SPECIALIST',
+  ASSISTANT = 'ASSISTANT',
+  SUPERVISOR = 'SUPERVISOR',
+}
+
+export enum DiagnosisStatus {
+  ACTIVE = 'ACTIVE',
+  RESOLVED = 'RESOLVED',
+  CHRONIC = 'CHRONIC',
+  RULED_OUT = 'RULED_OUT',
+}
+
+export enum PrescriptionStatus {
+  ACTIVE = 'ACTIVE',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  DISCONTINUED = 'DISCONTINUED',
+}
+
+export enum LabRequestStatus {
+  REQUESTED = 'REQUESTED',
+  SCHEDULED = 'SCHEDULED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum LabUrgency {
+  STAT = 'STAT',
+  URGENT = 'URGENT',
+  ROUTINE = 'ROUTINE',
+}
+
+export enum LabResultStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  CRITICAL = 'CRITICAL',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ImagingRequestStatus {
+  REQUESTED = 'REQUESTED',
+  SCHEDULED = 'SCHEDULED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ImagingType {
+  XRAY = 'XRAY',
+  CT_SCAN = 'CT_SCAN',
+  MRI = 'MRI',
+  ULTRASOUND = 'ULTRASOUND',
+  MAMMOGRAM = 'MAMMOGRAM',
+  PET_SCAN = 'PET_SCAN',
+  NUCLEAR_MEDICINE = 'NUCLEAR_MEDICINE',
+  FLUOROSCOPY = 'FLUOROSCOPY',
+}
+
+export enum ImagingUrgency {
+  STAT = 'STAT',
+  URGENT = 'URGENT',
+  ROUTINE = 'ROUTINE',
+}
+
+export enum ImagingResultStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  CRITICAL = 'CRITICAL',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ProcedureStatus {
+  SCHEDULED = 'SCHEDULED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  POSTPONED = 'POSTPONED',
+}
+
+export enum AdmissionType {
+  EMERGENCY = 'EMERGENCY',
+  ELECTIVE = 'ELECTIVE',
+  TRANSFER = 'TRANSFER',
+  OBSERVATION = 'OBSERVATION',
+}
+
+export enum AdmissionStatus {
+  ADMITTED = 'ADMITTED',
+  DISCHARGED = 'DISCHARGED',
+  TRANSFERRED = 'TRANSFERRED',
+}
+
+export enum ReferralType {
+  SPECIALIST = 'SPECIALIST',
+  SECOND_OPINION = 'SECOND_OPINION',
+  DIAGNOSTIC = 'DIAGNOSTIC',
+  THERAPY = 'THERAPY',
+  SURGERY = 'SURGERY',
+  EMERGENCY = 'EMERGENCY',
+}
+
+export enum ReferralUrgency {
+  EMERGENCY = 'EMERGENCY',
+  URGENT = 'URGENT',
+  ROUTINE = 'ROUTINE',
+}
+
+export enum ReferralStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  COMPLETED = 'COMPLETED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum NoteType {
+  PROGRESS = 'PROGRESS',
+  ASSESSMENT = 'ASSESSMENT',
+  PLAN = 'PLAN',
+  EDUCATION = 'EDUCATION',
+  COMMUNICATION = 'COMMUNICATION',
+  INCIDENT = 'INCIDENT',
+}
+
+export enum WardType {
+  GENERAL = 'GENERAL',
+  ICU = 'ICU',
+  EMERGENCY = 'EMERGENCY',
+  SURGICAL = 'SURGICAL',
+  MEDICAL = 'MEDICAL',
+  PEDIATRIC = 'PEDIATRIC',
+  MATERNITY = 'MATERNITY',
+  PSYCHIATRIC = 'PSYCHIATRIC',
+  REHABILITATION = 'REHABILITATION',
+}
+
+export enum TreatmentLinkType {
+  FOLLOW_UP = 'FOLLOW_UP',
+  ESCALATION = 'ESCALATION',
+  REFERRAL = 'REFERRAL',
+  CONTINUATION = 'CONTINUATION',
+  PREPROCEDURE = 'PREPROCEDURE',
+  POSTPROCEDURE = 'POSTPROCEDURE',
+  SERIES = 'SERIES',
+  PARALLEL = 'PARALLEL',
+  REPLACEMENT = 'REPLACEMENT',
+  CANCELLATION = 'CANCELLATION',
+}
+
+// Treatment DTOs
+export interface CreateTreatmentDto {
+  patientId: string;
+  primaryProviderId: string;
+  appointmentId?: string;
+  title: string;
+  description?: string;
+  treatmentType: TreatmentType;
+  priority?: TreatmentPriority;
+  chiefComplaint?: string;
+  historyOfPresentIllness?: string;
+  pastMedicalHistory?: string;
+  allergies?: string;
+  medications?: string;
+  isEmergency?: boolean;
+  emergencyLevel?: EmergencyLevel;
+  additionalProviders?: {
+    providerId: string;
+    role?: ProviderRole;
+  }[];
+}
+
+export interface UpdateTreatmentDto {
+  title?: string;
+  description?: string;
+  treatmentType?: TreatmentType;
+  priority?: TreatmentPriority;
+  chiefComplaint?: string;
+  historyOfPresentIllness?: string;
+  pastMedicalHistory?: string;
+  allergies?: string;
+  medications?: string;
+  isEmergency?: boolean;
+  emergencyLevel?: EmergencyLevel;
+  status?: TreatmentStatus;
+  endDate?: string;
+}
+
+export interface TreatmentQueryParams {
+  page?: number;
+  limit?: number;
+  patientId?: string;
+  providerId?: string;
+  appointmentId?: string;
+  status?: TreatmentStatus;
+  treatmentType?: TreatmentType;
+  isEmergency?: boolean;
+}
+
+export interface CreateTreatmentLinkDto {
+  fromTreatmentId: string;
+  toTreatmentId: string;
+  linkType: TreatmentLinkType;
+  linkReason?: string;
+  notes?: string;
+}
+
+export interface UpdateTreatmentLinkDto {
+  linkReason?: string;
+  notes?: string;
+  isActive?: boolean;
+}

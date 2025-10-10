@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { treatmentService } from '@/services/treatment.service';
 import {
   Box,
   Drawer,
@@ -10,10 +13,8 @@ import {
   ListItemIcon,
   ListItemText,
   Collapse,
-  Divider,
   Typography,
   IconButton,
-  Tooltip,
   Avatar,
   Chip,
 } from '@mui/material';
@@ -29,17 +30,15 @@ import {
   CreditCard,
   TrendingUp,
   Logout,
-  Menu,
-  Close,
   VpnKey,
   BarChart,
   ListAlt,
   Layers,
   ExpandLess,
   ExpandMore,
-  AccountCircle,
   Schedule,
   EventBusy,
+  LocalHospital,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -79,6 +78,12 @@ const navigationItems = [
         href: '/appointments',
         icon: CalendarToday,
         permission: 'view_appointments',
+      },
+      {
+        title: 'Treatments',
+        href: '/treatments',
+        icon: LocalHospital,
+        permission: 'view_treatments',
       },
       {
         title: 'My Availability',
@@ -221,8 +226,22 @@ const navigationItems = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
   const location = useLocation();
-  const { user, logout, hasPermission, isAdmin } = useAuth();
+  const { user, staffMember, logout, hasPermission, isAdmin } = useAuth();
+  const { canViewTreatments } = usePermissions();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  const isAdminUser = isAdmin();
+
+  // Fetch pending transfers count (only for non-admin providers)
+  const { data: transferredData } = useQuery({
+    queryKey: ['sidebar-transferred-count'],
+    queryFn: () =>
+      treatmentService.getTransferredTreatments({ acknowledged: false }),
+    refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes
+    enabled: canViewTreatments() && !isAdminUser && !!staffMember,
+  });
+
+  const pendingTransfersCount = transferredData?.unacknowledged || 0;
 
   const handleLogout = () => {
     logout();
@@ -352,7 +371,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                       <item.icon />
                     </ListItemIcon>
                     <ListItemText
-                      primary={item.title}
+                      primary={
+                        item.title === 'Treatments' &&
+                        !isAdminUser &&
+                        pendingTransfersCount > 0 ? (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                            }}
+                          >
+                            {item.title}
+                            <Chip
+                              label={pendingTransfersCount}
+                              size='small'
+                              color='warning'
+                              sx={{
+                                height: 20,
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                              }}
+                            />
+                          </Box>
+                        ) : (
+                          item.title
+                        )
+                      }
                       sx={{
                         '& .MuiTypography-root': {
                           fontWeight: isActive ? 600 : 400,
