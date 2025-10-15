@@ -3,16 +3,23 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
+import { LabService } from '../lab/lab.service';
 import * as puppeteer from 'puppeteer';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => LabService))
+    private labService: LabService,
+  ) {}
 
   // Payment Management
   async createPayment(createPaymentDto: CreatePaymentDto) {
@@ -94,6 +101,27 @@ export class PaymentsService {
         paidDate: newStatus === 'PAID' ? new Date() : null,
       },
     });
+
+    // Update lab orders and lab requests when invoice is fully paid
+    if (newStatus === 'PAID') {
+      try {
+        // Update lab orders linked to this invoice
+        await this.labService.markLabOrderPaidByInvoice(invoiceId);
+
+        // Update lab requests linked to this invoice
+        await this.labService.markLabRequestsPaidByInvoice(invoiceId);
+
+        console.log(
+          `✅ Updated lab orders/requests for paid invoice ${invoiceId.slice(-8)}`,
+        );
+      } catch (error) {
+        // Log error but don't fail the payment
+        console.error(
+          'Error updating lab orders/requests after payment:',
+          error,
+        );
+      }
+    }
 
     // Update patient account balance
     await this.updatePatientAccountBalance(patientId, amount);

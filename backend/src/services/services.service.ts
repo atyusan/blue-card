@@ -346,6 +346,36 @@ export class ServicesService {
     });
   }
 
+  async getServicesByCategoryName(categoryName: string) {
+    // Try to find category by name first
+    const category = await this.prisma.serviceCategory.findFirst({
+      where: {
+        OR: [
+          { name: { equals: categoryName, mode: 'insensitive' } },
+          { id: categoryName }, // Also support ID lookup
+        ],
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException(
+        `Service category '${categoryName}' not found`,
+      );
+    }
+
+    return this.prisma.service.findMany({
+      where: {
+        categoryId: category.id,
+        isActive: true,
+      },
+      include: {
+        category: true,
+        department: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async getServicesRequiringPrePayment() {
     return this.prisma.service.findMany({
       where: {

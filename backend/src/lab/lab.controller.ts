@@ -32,6 +32,231 @@ import { CompleteLabTestDto } from './dto/complete-lab-test.dto';
 export class LabController {
   constructor(private readonly labService: LabService) {}
 
+  // Treatment-Based Lab Requests (Must be first - specific routes)
+  @Post('requests')
+  @ApiOperation({ summary: 'Create lab requests for a treatment' })
+  @ApiResponse({
+    status: 201,
+    description: 'Lab requests created successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Treatment or provider not found',
+  })
+  createLabRequests(@Body() createLabRequestDto: any) {
+    return this.labService.createLabRequests(createLabRequestDto);
+  }
+
+  @Get('requests/pool')
+  @ApiOperation({
+    summary: 'Get all available lab requests (pool for lab staff)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of available lab requests',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by request status',
+  })
+  @ApiQuery({
+    name: 'urgency',
+    required: false,
+    description: 'Filter by urgency level',
+  })
+  getLabRequestsPool(
+    @Query('status') status?: string,
+    @Query('urgency') urgency?: string,
+  ) {
+    return this.labService.getLabRequestsPool({ status, urgency });
+  }
+
+  @Get('results/all')
+  @ApiOperation({
+    summary: 'Get all lab results from both lab orders and lab requests',
+    description:
+      'Returns unified results from both external lab orders and treatment-based lab requests',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all lab results',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status (default: COMPLETED)',
+  })
+  @ApiQuery({
+    name: 'patientId',
+    required: false,
+    description: 'Filter by patient ID',
+  })
+  getAllLabResults(
+    @Query('status') status?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.labService.getAllLabResults({ status, patientId });
+  }
+
+  @Get('tests/all')
+  @ApiOperation({
+    summary: 'Get all lab tests for administrative monitoring',
+    description:
+      'Returns unified tests from both external lab orders and treatment-based lab requests with full details including payment status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all lab tests for administrative monitoring',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by test status',
+  })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    description: 'Filter by source (TREATMENT or EXTERNAL)',
+  })
+  @ApiQuery({
+    name: 'patientId',
+    required: false,
+    description: 'Filter by patient ID',
+  })
+  @ApiQuery({
+    name: 'isPaid',
+    required: false,
+    description: 'Filter by payment status',
+    type: Boolean,
+  })
+  getAllLabTests(
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('patientId') patientId?: string,
+    @Query('isPaid') isPaid?: string,
+  ) {
+    const isPaidBoolean =
+      isPaid === 'true' ? true : isPaid === 'false' ? false : undefined;
+    return this.labService.getAllLabTests({
+      status,
+      source,
+      patientId,
+      isPaid: isPaidBoolean,
+    });
+  }
+
+  @Get('requests/results')
+  @ApiOperation({
+    summary: 'Get all completed lab requests with results',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of lab requests with results',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by request status (defaults to COMPLETED)',
+  })
+  getLabResults(@Query('status') status?: string) {
+    return this.labService.getLabResults(status);
+  }
+
+  @Get('requests/provider/:providerId/assigned')
+  @ApiOperation({
+    summary: 'Get lab requests assigned to a specific lab provider',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of assigned lab requests',
+  })
+  getAssignedLabRequests(@Param('providerId') providerId: string) {
+    return this.labService.getAssignedLabRequests(providerId);
+  }
+
+  @Get('requests/treatment/:treatmentId')
+  @ApiOperation({ summary: 'Get lab requests for a specific treatment' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of lab requests for the treatment',
+  })
+  getLabRequestsByTreatment(@Param('treatmentId') treatmentId: string) {
+    return this.labService.getLabRequestsByTreatment(treatmentId);
+  }
+
+  @Post('requests/:id/claim')
+  @ApiOperation({ summary: 'Claim a lab request (lab staff picks up)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lab request claimed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab request not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Lab request already claimed or not available',
+  })
+  claimLabRequest(
+    @Param('id') id: string,
+    @Body() body: { labProviderId: string },
+  ) {
+    return this.labService.claimLabRequest(id, body.labProviderId);
+  }
+
+  @Post('requests/:id/start')
+  @ApiOperation({ summary: 'Start processing a lab request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lab request processing started',
+  })
+  startLabRequest(@Param('id') id: string) {
+    return this.labService.startLabRequest(id);
+  }
+
+  @Post('requests/:id/complete')
+  @ApiOperation({ summary: 'Complete lab request with results' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lab request completed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab request not found',
+  })
+  completeLabRequest(
+    @Param('id') id: string,
+    @Body() completeLabRequestDto: any,
+  ) {
+    return this.labService.completeLabRequest(id, completeLabRequestDto);
+  }
+
+  @Post('requests/:id/cancel')
+  @ApiOperation({ summary: 'Cancel a lab request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lab request cancelled successfully',
+  })
+  cancelLabRequest(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.labService.cancelLabRequest(id, body.reason);
+  }
+
+  @Get('requests/:id')
+  @ApiOperation({ summary: 'Get lab request by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lab request found with complete details',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab request not found',
+  })
+  getLabRequestById(@Param('id') id: string) {
+    return this.labService.getLabRequestById(id);
+  }
+
   // Lab Order Management
   @Post('orders')
   @ApiOperation({ summary: 'Create a new lab order' })
@@ -207,24 +432,6 @@ export class LabController {
     return this.labService.updateLabTest(testId, updateLabTestDto);
   }
 
-  @Post('tests/:testId/start')
-  @ApiOperation({ summary: 'Start a lab test' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lab test started successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Lab test not found',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Test is not in pending status',
-  })
-  startLabTest(@Param('testId') testId: string) {
-    return this.labService.startLabTest(testId);
-  }
-
   @Post('tests/:testId/complete')
   @ApiOperation({ summary: 'Complete a lab test with results' })
   @ApiResponse({
@@ -248,6 +455,177 @@ export class LabController {
       completeLabTestDto.result,
       completeLabTestDto.completedBy,
     );
+  }
+
+  // Lab Test Pool Management (for paid orders)
+  @Get('tests/pool/available')
+  @ApiOperation({
+    summary: 'Get available lab tests from paid orders',
+    description:
+      'Returns tests from paid lab orders that are available for lab staff to claim and process',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by test status (default: PENDING)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of available lab tests',
+  })
+  getAvailableLabTests(@Query('status') status?: string) {
+    return this.labService.getAvailableLabTests(status);
+  }
+
+  @Post('tests/:testId/claim')
+  @ApiOperation({
+    summary: 'Claim a lab test',
+    description: 'Lab technician claims a test from the pool to work on it',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test claimed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab test not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Test is not available for claiming',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Lab order must be paid before tests can be claimed',
+  })
+  claimLabTest(
+    @Param('testId') testId: string,
+    @Body('technicianId') technicianId: string,
+  ) {
+    return this.labService.claimLabTest(testId, technicianId);
+  }
+
+  @Post('tests/:testId/start-processing')
+  @ApiOperation({
+    summary: 'Start processing a claimed lab test',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test processing started successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab test not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Test must be claimed before starting',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'You can only start tests that you have claimed',
+  })
+  startLabTestProcessing(
+    @Param('testId') testId: string,
+    @Body('technicianId') technicianId: string,
+  ) {
+    return this.labService.startLabTest(testId, technicianId);
+  }
+
+  @Post('tests/:testId/complete-with-results')
+  @ApiOperation({
+    summary: 'Complete a lab test with detailed results',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test completed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab test not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Test must be in progress to complete',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'You can only complete tests that you are processing',
+  })
+  completeLabTestWithResults(
+    @Param('testId') testId: string,
+    @Body()
+    body: {
+      technicianId: string;
+      resultValue?: string;
+      resultUnit?: string;
+      referenceRange?: string;
+      isCritical?: boolean;
+      notes?: string;
+    },
+  ) {
+    const { technicianId, ...resultData } = body;
+    return this.labService.completeLabTestWithResults(
+      testId,
+      technicianId,
+      resultData,
+    );
+  }
+
+  @Post('tests/:testId/cancel')
+  @ApiOperation({
+    summary: 'Cancel a claimed lab test',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test cancelled successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Lab test not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Test is already completed or cancelled',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'You can only cancel tests that you have claimed',
+  })
+  cancelLabTest(
+    @Param('testId') testId: string,
+    @Body() body: { technicianId: string; reason: string },
+  ) {
+    return this.labService.cancelLabTest(
+      testId,
+      body.technicianId,
+      body.reason,
+    );
+  }
+
+  @Get('tests/my-tests')
+  @ApiOperation({
+    summary: 'Get lab tests assigned to current technician',
+  })
+  @ApiQuery({
+    name: 'technicianId',
+    required: true,
+    description: 'ID of the lab technician',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by test status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of assigned lab tests',
+  })
+  getMyLabTests(
+    @Query('technicianId') technicianId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.labService.getMyLabTests(technicianId, status);
   }
 
   // Enhanced Lab Order Queries and Reports

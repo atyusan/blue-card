@@ -217,6 +217,35 @@ export const usePermissions = () => {
     return hasPermission('manage_treatment_links') || isAdmin();
   }, [hasPermission, isAdmin]);
 
+  // Laboratory permission methods
+  const canViewLabOrders = useCallback((): boolean => {
+    return hasPermission('view_lab_orders') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canCreateLabOrders = useCallback((): boolean => {
+    return hasPermission('create_lab_orders') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canViewLabTests = useCallback((): boolean => {
+    return hasPermission('view_lab_tests') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canViewLabResults = useCallback((): boolean => {
+    return hasPermission('view_lab_results') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canProcessLabTests = useCallback((): boolean => {
+    return hasPermission('process_lab_tests') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canViewLabRequests = useCallback((): boolean => {
+    return hasPermission('view_lab_requests') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
+  const canRequestLabTests = useCallback((): boolean => {
+    return hasPermission('request_lab_tests') || isAdmin();
+  }, [hasPermission, isAdmin]);
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -252,6 +281,14 @@ export const usePermissions = () => {
     canUpdateTreatmentStatus,
     canManageTreatmentProviders,
     canManageTreatmentLinks,
+    // Laboratory permissions
+    canViewLabOrders,
+    canCreateLabOrders,
+    canViewLabTests,
+    canViewLabResults,
+    canProcessLabTests,
+    canViewLabRequests,
+    canRequestLabTests,
     user,
   };
 };

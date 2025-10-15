@@ -39,6 +39,10 @@ import {
   Schedule,
   EventBusy,
   LocalHospital,
+  Science,
+  Biotech,
+  Assignment,
+  Assessment,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -96,6 +100,45 @@ const navigationItems = [
         href: '/timeoff-management',
         icon: EventBusy,
         permission: 'admin',
+      },
+    ],
+  },
+
+  // Laboratory
+  {
+    title: 'Laboratory',
+    icon: Science,
+    permission: 'view_lab_requests',
+    children: [
+      {
+        title: 'Lab Requests Pool',
+        href: '/lab/requests-pool',
+        icon: Assignment,
+        permission: 'process_lab_tests',
+      },
+      {
+        title: 'Lab Test Pool',
+        href: '/lab/test-pool',
+        icon: Biotech,
+        permission: 'process_lab_tests',
+      },
+      {
+        title: 'Lab Orders',
+        href: '/lab/orders',
+        icon: ListAlt,
+        permission: 'view_lab_orders',
+      },
+      {
+        title: 'Lab Results',
+        href: '/lab/results',
+        icon: Assessment,
+        permission: 'view_lab_results',
+      },
+      {
+        title: 'Lab Tests',
+        href: '/lab/tests',
+        icon: Biotech,
+        permission: 'view_lab_tests',
       },
     ],
   },

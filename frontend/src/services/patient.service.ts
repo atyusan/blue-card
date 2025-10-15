@@ -25,6 +25,14 @@ export interface PatientStats {
 }
 
 class PatientService {
+  // Get all patients (for dropdowns, no pagination)
+  async getAllPatients(): Promise<Patient[]> {
+    const response = await http.get<PaginatedResponse<Patient>>(
+      '/patients?limit=1000'
+    );
+    return response.data;
+  }
+
   // Get all patients with pagination and filtering
   async getPatients(
     params: PatientQueryParams = {}

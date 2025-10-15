@@ -67,11 +67,17 @@ import {
   Cancel,
   PlayArrow,
   BarChart,
+  Science,
+  Add,
+  Remove,
 } from '@mui/icons-material';
 import { treatmentService } from '../services/treatment.service';
 import { staffService } from '../services/staff.service';
+import { labRequestService } from '../services/lab-request.service';
+import { serviceService } from '../services/service.service';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatDate, getInitials } from '@/utils';
 
 interface TabPanelProps {
@@ -102,6 +108,7 @@ const TreatmentDetailsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const theme = useTheme();
   const { showSuccess, showError } = useToast();
+  const { staffMember } = useAuth();
 
   const {
     canViewTreatments,
@@ -151,6 +158,38 @@ const TreatmentDetailsPage: React.FC = () => {
   });
   const [treatmentSearch, setTreatmentSearch] = useState<string>('');
 
+  // Lab request state
+  const [labRequestDialogOpen, setLabRequestDialogOpen] = useState(false);
+  const [labTests, setLabTests] = useState<
+    Array<{
+      serviceId: string;
+      testType: string;
+      testName: string;
+      description: string;
+      specimenType: string;
+      collectionInstructions: string;
+    }>
+  >([
+    {
+      serviceId: '',
+      testType: '',
+      testName: '',
+      description: '',
+      specimenType: '',
+      collectionInstructions: '',
+    },
+  ]);
+  const [labUrgency, setLabUrgency] = useState<'STAT' | 'URGENT' | 'ROUTINE'>(
+    'ROUTINE'
+  );
+
+  // Fetch laboratory services for dropdown
+  const { data: labServices = [], isLoading: loadingLabServices } = useQuery({
+    queryKey: ['lab-services'],
+    queryFn: () => serviceService.getServicesByCategory('Laboratory'),
+    enabled: labRequestDialogOpen, // Only fetch when dialog is open
+  });
+
   // Fetch treatment details
   const {
     data: treatment,
@@ -195,6 +234,13 @@ const TreatmentDetailsPage: React.FC = () => {
   });
 
   const patientTreatments = patientTreatmentsData?.data || [];
+
+  // Fetch lab requests for this treatment
+  const { data: labRequests, refetch: refetchLabRequests } = useQuery({
+    queryKey: ['lab-requests', id],
+    queryFn: () => labRequestService.getLabRequestsByTreatment(id!),
+    enabled: !!id && canViewTreatments(),
+  });
 
   // Delete treatment mutation
   const deleteTreatmentMutation = useMutation({
@@ -290,6 +336,29 @@ const TreatmentDetailsPage: React.FC = () => {
     },
   });
 
+  // Create lab request mutation
+  const createLabRequestMutation = useMutation({
+    mutationFn: (data: any) => labRequestService.createLabRequests(data),
+    onSuccess: () => {
+      showSuccess('Lab tests requested successfully');
+      queryClient.invalidateQueries({ queryKey: ['lab-requests', id] });
+      setLabRequestDialogOpen(false);
+      setLabTests([
+        {
+          testType: '',
+          testName: '',
+          description: '',
+          specimenType: '',
+          collectionInstructions: '',
+        },
+      ]);
+      setLabUrgency('ROUTINE');
+    },
+    onError: (error: any) => {
+      showError(error.message || 'Failed to request lab tests');
+    },
+  });
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
   };
@@ -355,6 +424,57 @@ const TreatmentDetailsPage: React.FC = () => {
     linkTreatmentMutation.mutate({
       fromTreatmentId: id,
       ...linkForm,
+    });
+  };
+
+  const handleLabRequestOpen = () => {
+    setLabRequestDialogOpen(true);
+  };
+
+  const handleAddLabTest = () => {
+    setLabTests([
+      ...labTests,
+      {
+        serviceId: '',
+        testType: '',
+        testName: '',
+        description: '',
+        specimenType: '',
+        collectionInstructions: '',
+      },
+    ]);
+  };
+
+  const handleRemoveLabTest = (index: number) => {
+    setLabTests(labTests.filter((_, i) => i !== index));
+  };
+
+  const handleLabTestChange = (index: number, field: string, value: string) => {
+    const newTests = [...labTests];
+    newTests[index] = { ...newTests[index], [field]: value };
+    setLabTests(newTests);
+  };
+
+  const handleLabRequestSubmit = () => {
+    // Validate at least one test with serviceId selected
+    const validTests = labTests.filter(
+      (test) => test.serviceId && test.testName
+    );
+    if (validTests.length === 0) {
+      showError('Please select at least one laboratory test');
+      return;
+    }
+
+    if (!staffMember?.id) {
+      showError('Staff member information not available');
+      return;
+    }
+
+    createLabRequestMutation.mutate({
+      treatmentId: id!,
+      requestingProviderId: staffMember.id,
+      tests: validTests,
+      urgency: labUrgency,
     });
   };
 
@@ -461,6 +581,36 @@ const TreatmentDetailsPage: React.FC = () => {
           bg: theme.palette.grey[500],
           icon: <Schedule />,
         };
+    }
+  };
+
+  const getUrgencyColor = (urgency: string) => {
+    switch (urgency) {
+      case 'STAT':
+        return 'error';
+      case 'URGENT':
+        return 'warning';
+      case 'ROUTINE':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'REQUESTED':
+        return 'info';
+      case 'CLAIMED':
+        return 'primary';
+      case 'IN_PROGRESS':
+        return 'warning';
+      case 'COMPLETED':
+        return 'success';
+      case 'CANCELLED':
+        return 'error';
+      default:
+        return 'default';
     }
   };
 
@@ -749,6 +899,7 @@ const TreatmentDetailsPage: React.FC = () => {
             iconPosition='start'
             label='Linked Treatments'
           />
+          <Tab icon={<Science />} iconPosition='start' label='Lab Requests' />
           <Tab icon={<BarChart />} iconPosition='start' label='Statistics' />
         </Tabs>
       </Paper>
@@ -1664,8 +1815,277 @@ const TreatmentDetailsPage: React.FC = () => {
         )}
       </TabPanel>
 
-      {/* Tab 6: Statistics */}
+      {/* Tab 6: Lab Requests */}
       <TabPanel value={currentTab} index={5}>
+        <Card sx={{ borderRadius: 3 }}>
+          <CardContent>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                    display: 'flex',
+                  }}
+                >
+                  <Science sx={{ color: 'info.main', fontSize: 28 }} />
+                </Box>
+                <Box>
+                  <Typography variant='h6' fontWeight={700}>
+                    Lab Requests & Results
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    Laboratory tests requested for this treatment
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {labRequests && labRequests.length > 0 ? (
+              <Stack spacing={2}>
+                {labRequests.map((request: any) => (
+                  <Card
+                    key={request.id}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor:
+                        request.status === 'COMPLETED'
+                          ? alpha(theme.palette.success.main, 0.05)
+                          : 'background.paper',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <Box flex={1}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            mb: 1,
+                          }}
+                        >
+                          <Typography variant='subtitle1' fontWeight={600}>
+                            {request.testName}
+                          </Typography>
+                          <Chip
+                            label={request.urgency}
+                            size='small'
+                            color={getUrgencyColor(request.urgency) as any}
+                          />
+                          <Chip
+                            label={request.status}
+                            size='small'
+                            color={getStatusColor(request.status) as any}
+                            variant='outlined'
+                          />
+                        </Box>
+
+                        <Typography
+                          variant='body2'
+                          color='text.secondary'
+                          gutterBottom
+                        >
+                          Type: {request.testType}
+                          {request.specimenType &&
+                            ` | Specimen: ${request.specimenType}`}
+                        </Typography>
+
+                        {request.description && (
+                          <Typography
+                            variant='body2'
+                            color='text.secondary'
+                            sx={{ mt: 1 }}
+                          >
+                            {request.description}
+                          </Typography>
+                        )}
+
+                        <Box
+                          sx={{
+                            mt: 2,
+                            display: 'flex',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Box>
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                              display='block'
+                            >
+                              Requested By
+                            </Typography>
+                            <Typography variant='body2'>
+                              Dr. {request.requestingProvider?.user?.firstName}{' '}
+                              {request.requestingProvider?.user?.lastName}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                              display='block'
+                            >
+                              Requested On
+                            </Typography>
+                            <Typography variant='body2'>
+                              {formatDate(request.requestedAt)}
+                            </Typography>
+                          </Box>
+                          {request.labProvider && (
+                            <Box>
+                              <Typography
+                                variant='caption'
+                                color='text.secondary'
+                                display='block'
+                              >
+                                Lab Technician
+                              </Typography>
+                              <Typography variant='body2'>
+                                {request.labProvider.user?.firstName}{' '}
+                                {request.labProvider.user?.lastName}
+                              </Typography>
+                            </Box>
+                          )}
+                          {request.completedAt && (
+                            <Box>
+                              <Typography
+                                variant='caption'
+                                color='text.secondary'
+                                display='block'
+                              >
+                                Completed On
+                              </Typography>
+                              <Typography variant='body2'>
+                                {formatDate(request.completedAt)}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+
+                        {/* Lab Results */}
+                        {request.results && request.results.length > 0 && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography
+                              variant='subtitle2'
+                              fontWeight={600}
+                              gutterBottom
+                            >
+                              Results:
+                            </Typography>
+                            <Stack spacing={1}>
+                              {request.results.map(
+                                (result: any, idx: number) => (
+                                  <Card
+                                    key={idx}
+                                    sx={{
+                                      p: 1.5,
+                                      bgcolor:
+                                        result.status === 'CRITICAL'
+                                          ? alpha(theme.palette.error.main, 0.1)
+                                          : alpha(
+                                              theme.palette.success.main,
+                                              0.05
+                                            ),
+                                      border: '1px solid',
+                                      borderColor:
+                                        result.status === 'CRITICAL'
+                                          ? 'error.main'
+                                          : 'divider',
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography
+                                          variant='body2'
+                                          fontWeight={600}
+                                        >
+                                          {result.resultType}
+                                        </Typography>
+                                        <Typography variant='body1'>
+                                          {result.resultValue} {result.unit}
+                                          {result.normalRange && (
+                                            <Typography
+                                              component='span'
+                                              variant='body2'
+                                              color='text.secondary'
+                                              sx={{ ml: 1 }}
+                                            >
+                                              (Normal: {result.normalRange})
+                                            </Typography>
+                                          )}
+                                        </Typography>
+                                        {result.notes && (
+                                          <Typography
+                                            variant='caption'
+                                            color='text.secondary'
+                                          >
+                                            Notes: {result.notes}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                      {result.status === 'CRITICAL' && (
+                                        <Chip
+                                          label='CRITICAL'
+                                          size='small'
+                                          color='error'
+                                          icon={<Warning />}
+                                        />
+                                      )}
+                                    </Box>
+                                  </Card>
+                                )
+                              )}
+                            </Stack>
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  </Card>
+                ))}
+              </Stack>
+            ) : (
+              <Alert severity='info' sx={{ borderRadius: 2 }}>
+                <Typography variant='body2' fontWeight={600} gutterBottom>
+                  No Lab Requests
+                </Typography>
+                <Typography variant='body2'>
+                  No laboratory tests have been requested for this treatment
+                  yet. Use the "Request Lab Tests" option in the actions menu to
+                  request tests.
+                </Typography>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </TabPanel>
+
+      {/* Tab 7: Statistics */}
+      <TabPanel value={currentTab} index={6}>
         <Card
           sx={{
             borderRadius: 3,
@@ -1822,6 +2242,17 @@ const TreatmentDetailsPage: React.FC = () => {
             <Typography>Transfer Treatment</Typography>
           </MenuItem>
         )}
+        <MenuItem
+          onClick={() => {
+            handleLabRequestOpen();
+            handleActionMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <Science fontSize='small' color='info' />
+          </ListItemIcon>
+          <Typography>Request Lab Tests</Typography>
+        </MenuItem>
         {canDeleteTreatments() && (
           <>
             <Divider />
@@ -2554,6 +2985,372 @@ const TreatmentDetailsPage: React.FC = () => {
             sx={{ borderRadius: 2 }}
           >
             {linkTreatmentMutation.isPending ? 'Linking...' : 'Link Treatment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Lab Request Dialog */}
+      <Dialog
+        open={labRequestDialogOpen}
+        onClose={() => setLabRequestDialogOpen(false)}
+        maxWidth='md'
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                p: 1,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.info.main, 0.1),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Science sx={{ color: 'info.main', fontSize: 28 }} />
+            </Box>
+            <Box flex={1}>
+              <Typography variant='h6' fontWeight={600}>
+                Request Lab Tests
+              </Typography>
+              <Typography variant='body2' color='text.secondary'>
+                Request multiple laboratory tests for this treatment
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Stack spacing={3}>
+            {/* Urgency Level */}
+            <FormControl fullWidth>
+              <InputLabel>Urgency Level</InputLabel>
+              <Select
+                value={labUrgency}
+                onChange={(e) => setLabUrgency(e.target.value as any)}
+                label='Urgency Level'
+                sx={{ borderRadius: 2 }}
+              >
+                <MenuItem value='ROUTINE'>Routine</MenuItem>
+                <MenuItem value='URGENT'>Urgent</MenuItem>
+                <MenuItem value='STAT'>STAT (Immediate)</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Lab Tests */}
+            <Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 2,
+                }}
+              >
+                <Typography variant='subtitle1' fontWeight={600}>
+                  Laboratory Tests
+                </Typography>
+                <Button
+                  size='small'
+                  startIcon={<Add />}
+                  onClick={handleAddLabTest}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Add Test
+                </Button>
+              </Box>
+
+              {labTests.map((test, index) => (
+                <Card
+                  key={index}
+                  sx={{
+                    mb: 2,
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant='subtitle2' fontWeight={600}>
+                        Test #{index + 1}
+                      </Typography>
+                      {labTests.length > 1 && (
+                        <IconButton
+                          size='small'
+                          onClick={() => handleRemoveLabTest(index)}
+                          color='error'
+                        >
+                          <Remove />
+                        </IconButton>
+                      )}
+                    </Box>
+
+                    <FormControl fullWidth required>
+                      <InputLabel>Select Laboratory Test</InputLabel>
+                      <Select
+                        value={test.serviceId}
+                        onChange={(e) => {
+                          const selectedService = labServices.find(
+                            (s: any) => s.id === e.target.value
+                          );
+                          if (selectedService) {
+                            // Update the test with service data
+                            const updatedTests = [...labTests];
+                            updatedTests[index] = {
+                              ...updatedTests[index],
+                              serviceId: selectedService.id,
+                              testName: selectedService.name,
+                              testType: 'LABORATORY',
+                              description: selectedService.description || '',
+                            };
+                            setLabTests(updatedTests);
+                          }
+                        }}
+                        label='Select Laboratory Test'
+                        sx={{ borderRadius: 2 }}
+                        disabled={loadingLabServices}
+                      >
+                        {loadingLabServices ? (
+                          <MenuItem disabled>
+                            Loading laboratory tests...
+                          </MenuItem>
+                        ) : labServices.length === 0 ? (
+                          <MenuItem disabled>
+                            No laboratory tests available
+                          </MenuItem>
+                        ) : (
+                          labServices.map((service: any) => (
+                            <MenuItem key={service.id} value={service.id}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  width: '100%',
+                                }}
+                              >
+                                <Typography variant='body2'>
+                                  {service.name}
+                                </Typography>
+                                <Typography
+                                  variant='body2'
+                                  color='primary'
+                                  fontWeight={600}
+                                >
+                                  ${Number(service.currentPrice).toFixed(2)}
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                    </FormControl>
+
+                    {test.testName && (
+                      <Alert severity='info' sx={{ borderRadius: 2 }}>
+                        <Typography variant='body2'>
+                          <strong>Selected:</strong> {test.testName}
+                          {test.serviceId &&
+                            labServices.find(
+                              (s: any) => s.id === test.serviceId
+                            ) && (
+                              <>
+                                {' '}
+                                -{' '}
+                                <strong>
+                                  $
+                                  {Number(
+                                    labServices.find(
+                                      (s: any) => s.id === test.serviceId
+                                    )?.currentPrice || 0
+                                  ).toFixed(2)}
+                                </strong>
+                              </>
+                            )}
+                        </Typography>
+                      </Alert>
+                    )}
+
+                    <TextField
+                      fullWidth
+                      label='Additional Notes (Optional)'
+                      placeholder='Any specific instructions or observations...'
+                      value={test.description}
+                      onChange={(e) =>
+                        handleLabTestChange(
+                          index,
+                          'description',
+                          e.target.value
+                        )
+                      }
+                      multiline
+                      rows={2}
+                      sx={{ borderRadius: 2 }}
+                    />
+
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <FormControl fullWidth>
+                        <InputLabel>Specimen Type</InputLabel>
+                        <Select
+                          value={test.specimenType}
+                          onChange={(e) =>
+                            handleLabTestChange(
+                              index,
+                              'specimenType',
+                              e.target.value
+                            )
+                          }
+                          label='Specimen Type'
+                          sx={{ borderRadius: 2 }}
+                        >
+                          <MenuItem value='Whole Blood'>Whole Blood</MenuItem>
+                          <MenuItem value='Serum'>Serum</MenuItem>
+                          <MenuItem value='Plasma'>Plasma</MenuItem>
+                          <MenuItem value='Urine'>Urine</MenuItem>
+                          <MenuItem value='Stool'>Stool</MenuItem>
+                          <MenuItem value='Sputum'>Sputum</MenuItem>
+                          <MenuItem value='CSF'>
+                            Cerebrospinal Fluid (CSF)
+                          </MenuItem>
+                          <MenuItem value='Saliva'>Saliva</MenuItem>
+                          <MenuItem value='Swab'>
+                            Swab (Throat/Nasal/Wound)
+                          </MenuItem>
+                          <MenuItem value='Tissue'>Tissue Sample</MenuItem>
+                          <MenuItem value='Aspirate'>Aspirate</MenuItem>
+                          <MenuItem value='Biopsy'>Biopsy</MenuItem>
+                          <MenuItem value='Other'>Other</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        fullWidth
+                        label='Collection Instructions'
+                        placeholder='Special handling notes'
+                        value={test.collectionInstructions}
+                        onChange={(e) =>
+                          handleLabTestChange(
+                            index,
+                            'collectionInstructions',
+                            e.target.value
+                          )
+                        }
+                        sx={{ borderRadius: 2 }}
+                      />
+                    </Box>
+                  </Stack>
+                </Card>
+              ))}
+            </Box>
+
+            <Alert severity='info' sx={{ borderRadius: 2 }}>
+              <Typography variant='body2' fontWeight={600} gutterBottom>
+                Lab Test Workflow
+              </Typography>
+              <Typography variant='body2'>
+                Lab tests will be added to the pool for laboratory staff to
+                claim and process. You will be notified when results are
+                available.
+              </Typography>
+            </Alert>
+
+            {/* Total Cost Summary */}
+            {labTests.some((test) => test.serviceId) && (
+              <Card
+                sx={{
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.warning.main, 0.08),
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                }}
+              >
+                <Box p={2}>
+                  <Typography variant='subtitle2' fontWeight={600} gutterBottom>
+                    💰 Cost Summary
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant='body2' color='text.secondary'>
+                      Selected Tests:
+                    </Typography>
+                    <Typography variant='body2' fontWeight={600}>
+                      {labTests.filter((t) => t.serviceId).length}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ my: 1 }} />
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
+                    <Typography variant='h6' fontWeight={700}>
+                      Total Amount:
+                    </Typography>
+                    <Typography
+                      variant='h6'
+                      fontWeight={700}
+                      color='warning.main'
+                    >
+                      $
+                      {labTests
+                        .filter((t) => t.serviceId)
+                        .reduce((sum, test) => {
+                          const service = labServices.find(
+                            (s: any) => s.id === test.serviceId
+                          );
+                          return (
+                            sum + (service ? Number(service.currentPrice) : 0)
+                          );
+                        }, 0)
+                        .toFixed(2)}
+                    </Typography>
+                  </Box>
+                  <Alert severity='warning' sx={{ mt: 2, borderRadius: 2 }}>
+                    <Typography variant='caption'>
+                      <strong>⚠️ Payment Required:</strong> An invoice will be
+                      generated and must be paid before lab staff can process
+                      these tests.
+                    </Typography>
+                  </Alert>
+                </Box>
+              </Card>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button
+            onClick={() => setLabRequestDialogOpen(false)}
+            variant='outlined'
+            sx={{ borderRadius: 2 }}
+            disabled={createLabRequestMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleLabRequestSubmit}
+            variant='contained'
+            color='info'
+            disabled={createLabRequestMutation.isPending}
+            startIcon={<Science />}
+            sx={{ borderRadius: 2 }}
+          >
+            {createLabRequestMutation.isPending
+              ? 'Requesting...'
+              : 'Request Tests'}
           </Button>
         </DialogActions>
       </Dialog>

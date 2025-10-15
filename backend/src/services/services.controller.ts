@@ -263,6 +263,20 @@ export class ServicesController {
     return this.servicesService.updatePrice(id, body.price);
   }
 
+  @Get('category/:categoryName')
+  @ApiOperation({ summary: 'Get services by category name or ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of services in the category',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service category not found',
+  })
+  getServicesByCategoryName(@Param('categoryName') categoryName: string) {
+    return this.servicesService.getServicesByCategoryName(categoryName);
+  }
+
   @Get('categories/:categoryId/services')
   @ApiOperation({ summary: 'Get services by category' })
   @ApiResponse({

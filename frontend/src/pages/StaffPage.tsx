@@ -15,6 +15,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   IconButton,
   Tooltip,
   Dialog,
@@ -76,6 +77,8 @@ export const StaffPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filters, setFilters] = useState({
     departmentId: '',
     department: '',
@@ -273,6 +276,17 @@ export const StaffPage: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const handleConfirmDelete = () => {
     if (staffToDelete) {
       deleteStaffMutation.mutate(staffToDelete.id);
@@ -355,7 +369,7 @@ export const StaffPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Header */}
       <Box
         sx={{
@@ -813,121 +827,138 @@ export const StaffPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {staff.map((staffMember) => (
-                <TableRow key={staffMember.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar
-                        sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}
+              {staff
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((staffMember) => (
+                  <TableRow key={staffMember.id} hover>
+                    <TableCell>
+                      <Box
+                        sx={{ display: 'flex', alignItems: 'center', gap: 2 }}
                       >
-                        {staffMember.user.firstName[0]}
-                        {staffMember.user.lastName[0]}
-                      </Avatar>
-                      <Box>
-                        <Typography
-                          variant='subtitle2'
-                          sx={{ fontWeight: 600 }}
+                        <Avatar
+                          sx={{
+                            bgcolor: 'primary.main',
+                            width: 32,
+                            height: 32,
+                          }}
                         >
-                          {staffMember.user.firstName}{' '}
-                          {staffMember.user.lastName}
-                        </Typography>
-                        <Typography variant='body2' color='text.secondary'>
-                          {staffMember.user.email}
-                        </Typography>
+                          {staffMember.user.firstName[0]}
+                          {staffMember.user.lastName[0]}
+                        </Avatar>
+                        <Box>
+                          <Typography
+                            variant='subtitle2'
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {staffMember.user.firstName}{' '}
+                            {staffMember.user.lastName}
+                          </Typography>
+                          <Typography variant='body2' color='text.secondary'>
+                            {staffMember.user.email}
+                          </Typography>
+                        </Box>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={staffMember.employeeId}
-                      size='small'
-                      color='primary'
-                      variant='outlined'
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={staffMember.department?.name || 'No Department'}
-                      size='small'
-                      color='secondary'
-                      variant='outlined'
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant='body2' color='text.secondary'>
-                      {staffMember.specialization || 'N/A'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant='body2' color='text.secondary'>
-                      {new Date(staffMember.hireDate).toLocaleDateString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={staffMember.isActive ? 'Active' : 'Inactive'}
-                      color={staffMember.isActive ? 'success' : 'default'}
-                      size='small'
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={
-                        staffMember.serviceProvider
-                          ? 'Service Provider'
-                          : 'Staff'
-                      }
-                      color={staffMember.serviceProvider ? 'info' : 'default'}
-                      size='small'
-                      variant={
-                        staffMember.serviceProvider ? 'filled' : 'outlined'
-                      }
-                    />
-                  </TableCell>
-                  <TableCell align='right'>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        gap: 1,
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <Tooltip title='View Details'>
-                        <IconButton
-                          size='small'
-                          onClick={() => handleViewStaff(staffMember)}
-                        >
-                          <Visibility fontSize='small' />
-                        </IconButton>
-                      </Tooltip>
-                      {canManageStaff() && (
-                        <>
-                          <Tooltip title='Edit Staff Member'>
-                            <IconButton
-                              size='small'
-                              onClick={() => handleEditStaff(staffMember)}
-                            >
-                              <Edit fontSize='small' />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title='Delete Staff Member'>
-                            <IconButton
-                              size='small'
-                              onClick={() => handleDeleteStaff(staffMember)}
-                              color='error'
-                            >
-                              <Delete fontSize='small' />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={staffMember.employeeId}
+                        size='small'
+                        color='primary'
+                        variant='outlined'
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={staffMember.department?.name || 'No Department'}
+                        size='small'
+                        color='secondary'
+                        variant='outlined'
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant='body2' color='text.secondary'>
+                        {staffMember.specialization || 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant='body2' color='text.secondary'>
+                        {new Date(staffMember.hireDate).toLocaleDateString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={staffMember.isActive ? 'Active' : 'Inactive'}
+                        color={staffMember.isActive ? 'success' : 'default'}
+                        size='small'
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={
+                          staffMember.serviceProvider
+                            ? 'Service Provider'
+                            : 'Staff'
+                        }
+                        color={staffMember.serviceProvider ? 'info' : 'default'}
+                        size='small'
+                        variant={
+                          staffMember.serviceProvider ? 'filled' : 'outlined'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align='right'>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          gap: 1,
+                          justifyContent: 'flex-end',
+                        }}
+                      >
+                        <Tooltip title='View Details'>
+                          <IconButton
+                            size='small'
+                            onClick={() => handleViewStaff(staffMember)}
+                          >
+                            <Visibility fontSize='small' />
+                          </IconButton>
+                        </Tooltip>
+                        {canManageStaff() && (
+                          <>
+                            <Tooltip title='Edit Staff Member'>
+                              <IconButton
+                                size='small'
+                                onClick={() => handleEditStaff(staffMember)}
+                              >
+                                <Edit fontSize='small' />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title='Delete Staff Member'>
+                              <IconButton
+                                size='small'
+                                onClick={() => handleDeleteStaff(staffMember)}
+                                color='error'
+                              >
+                                <Delete fontSize='small' />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component='div'
+          count={staff.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
 
       {/* Staff Dialog */}

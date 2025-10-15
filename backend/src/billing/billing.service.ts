@@ -28,6 +28,14 @@ export class BillingService {
     private readonly paystackService: PaystackService,
   ) {}
 
+  // Injected dynamically to avoid circular dependency
+  private labService: any;
+
+  // Setter for lab service (called from module)
+  setLabService(labService: any) {
+    this.labService = labService;
+  }
+
   // Helper function to convert unitPrice to number
   private parseUnitPrice(unitPrice: string | number): number {
     return typeof unitPrice === 'string' ? parseFloat(unitPrice) : unitPrice;
@@ -627,6 +635,23 @@ export class BillingService {
         },
       },
     });
+
+    // If invoice is fully paid, update related lab orders and lab requests
+    if (newStatus === 'PAID' && this.labService) {
+      try {
+        // Update lab orders linked to this invoice
+        await this.labService.markLabOrderPaidByInvoice(invoiceId);
+
+        // Update lab requests linked to this invoice
+        await this.labService.markLabRequestsPaidByInvoice(invoiceId);
+      } catch (error) {
+        // Log error but don't fail the payment
+        console.error(
+          'Error updating lab orders/requests after payment:',
+          error,
+        );
+      }
+    }
 
     return {
       payment,

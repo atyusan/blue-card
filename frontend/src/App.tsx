@@ -23,6 +23,14 @@ import AppointmentDetailsPage from './pages/AppointmentDetailsPage';
 import CreateAppointmentPage from './pages/CreateAppointmentPage';
 import TreatmentsPage from './pages/TreatmentsPage';
 import TreatmentDetailsPage from './pages/TreatmentDetailsPage';
+import LabRequestsPoolPage from './pages/LabRequestsPoolPage';
+import LabOrdersPage from './pages/LabOrdersPage';
+import LabOrderDetailsPage from './pages/LabOrderDetailsPage';
+import CreateLabOrderPage from './pages/CreateLabOrderPage';
+import LabResultsPage from './pages/LabResultsPage';
+import LabTestPoolPage from './pages/LabTestPoolPage';
+import LabResultDetailsPage from './pages/LabResultDetailsPage';
+import LabTestsPage from './pages/LabTestsPage';
 import ProviderAvailabilityPage from './pages/ProviderAvailabilityPage';
 import TimeOffManagementPage from './pages/TimeOffManagementPage';
 import BillingPage from './pages/BillingPage';
@@ -208,6 +216,79 @@ const AppRoutes: React.FC = () => {
           element={
             <PermissionGuard permissions={['view_treatments']}>
               <TreatmentDetailsPage />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Lab Routes */}
+        <Route
+          path='lab/requests-pool'
+          element={
+            <PermissionGuard permissions={['process_lab_tests']}>
+              <LabRequestsPoolPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/orders/create'
+          element={
+            <PermissionGuard permissions={['create_lab_orders']}>
+              <CreateLabOrderPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/orders/:id'
+          element={
+            <PermissionGuard permissions={['view_lab_orders']}>
+              <LabOrderDetailsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/orders'
+          element={
+            <PermissionGuard permissions={['view_lab_orders']}>
+              <LabOrdersPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/test-pool'
+          element={
+            <PermissionGuard permissions={['process_lab_tests']}>
+              <LabTestPoolPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/results/:id'
+          element={
+            <PermissionGuard permissions={['view_lab_results']}>
+              <LabResultDetailsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/results'
+          element={
+            <PermissionGuard permissions={['view_lab_results']}>
+              <LabResultsPage />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path='lab/tests'
+          element={
+            <PermissionGuard permissions={['view_lab_tests']}>
+              <LabTestsPage />
             </PermissionGuard>
           }
         />

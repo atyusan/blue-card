@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from './api';
 import type { User, LoginFormData } from '../types';
 import { setLocalStorage, removeLocalStorage } from '../utils';
@@ -61,7 +62,7 @@ class AuthService {
     try {
       // Call logout endpoint to invalidate token on server
       await http.post('/auth/logout');
-    } catch (error) {
+    } catch {
       // Continue with logout even if server call fails
       console.warn('Server logout failed, continuing with local logout');
     } finally {
@@ -76,7 +77,7 @@ class AuthService {
     try {
       const response = await http.get<User>('/auth/profile');
       return response;
-    } catch (error) {
+    } catch {
       throw new Error('Failed to fetch user profile');
     }
   }
@@ -96,7 +97,7 @@ class AuthService {
       }
 
       return response;
-    } catch (error) {
+    } catch {
       throw new Error('Failed to update profile');
     }
   }
@@ -105,7 +106,7 @@ class AuthService {
   async changePassword(passwordData: ChangePasswordData): Promise<void> {
     try {
       await http.post('/auth/change-password', passwordData);
-    } catch (error) {
+    } catch {
       throw new Error('Failed to change password');
     }
   }
@@ -114,7 +115,7 @@ class AuthService {
   async requestPasswordReset(email: string): Promise<void> {
     try {
       await http.post('/auth/forgot-password', { email });
-    } catch (error) {
+    } catch {
       throw new Error('Failed to request password reset');
     }
   }
@@ -123,7 +124,7 @@ class AuthService {
   async resetPassword(token: string, newPassword: string): Promise<void> {
     try {
       await http.post('/auth/reset-password', { token, newPassword });
-    } catch (error) {
+    } catch {
       throw new Error('Failed to reset password');
     }
   }
@@ -153,7 +154,7 @@ class AuthService {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Date.now() / 1000;
       return payload.exp < currentTime;
-    } catch (error) {
+    } catch {
       return true;
     }
   }
@@ -165,7 +166,7 @@ class AuthService {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       return new Date(payload.exp * 1000);
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -179,7 +180,7 @@ class AuthService {
       const currentTime = Date.now() / 1000;
       const fiveMinutes = 5 * 60;
       return payload.exp - currentTime < fiveMinutes;
-    } catch (error) {
+    } catch {
       return true;
     }
   }

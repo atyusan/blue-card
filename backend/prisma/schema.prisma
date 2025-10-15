@@ -137,6 +137,7 @@ model StaffMember {
   cashTransactions          CashTransaction[]
   consultations             Consultation[]
   labOrders                 LabOrder[]
+  labTests                  LabTest[] // Lab tests claimed/processed by this technician
   pettyCashApprovals        PettyCash[]       @relation("PettyCashApprover")
   pettyCashRequests         PettyCash[]       @relation("PettyCashRequester")
   user                      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -262,6 +263,7 @@ model Service {
   charges            Charge[]
   dailyCharges       DailyCharge[]
   labTests           LabTest[]
+  labRequests        LabRequest[]
   category           ServiceCategory @relation(fields: [categoryId], references: [id])
   department         Department?     @relation(fields: [departmentId], references: [id])
 
@@ -290,6 +292,8 @@ model Invoice {
   paystackInvoice   PaystackInvoice?
   refunds           Refund[]
   appointments      Appointment[] // Link to appointments
+  labOrder          LabOrder? // Link to lab order
+  labRequest        LabRequest? // Link to lab request
 
   @@map("invoices")
 }
@@ -367,27 +371,38 @@ model LabOrder {
   balance     Decimal        @default(0) @db.Decimal(10, 2)
   paidAmount  Decimal        @default(0) @db.Decimal(10, 2)
   totalAmount Decimal        @default(0) @db.Decimal(10, 2)
+  invoiceId   String?        @unique // Link to invoice for payment validation
   doctor      StaffMember    @relation(fields: [doctorId], references: [id])
   patient     Patient        @relation(fields: [patientId], references: [id])
+  invoice     Invoice?       @relation(fields: [invoiceId], references: [id])
   tests       LabTest[]
 
   @@map("lab_orders")
 }
 
 model LabTest {
-  id         String        @id @default(cuid())
-  orderId    String
-  serviceId  String
-  result     String?
-  status     LabTestStatus @default(PENDING)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  isPaid     Boolean       @default(false)
-  notes      String?
-  totalPrice Decimal       @db.Decimal(10, 2)
-  unitPrice  Decimal       @db.Decimal(10, 2)
-  order      LabOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  service    Service       @relation(fields: [serviceId], references: [id])
+  id              String        @id @default(cuid())
+  orderId         String
+  serviceId       String
+  result          String?
+  resultValue     String? // Numeric or text result
+  resultUnit      String? // Unit of measurement (e.g., mg/dL)
+  referenceRange  String? // Normal range (e.g., "70-100")
+  isCritical      Boolean       @default(false)
+  status          LabTestStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  isPaid          Boolean       @default(false)
+  notes           String?
+  totalPrice      Decimal       @db.Decimal(10, 2)
+  unitPrice       Decimal       @db.Decimal(10, 2)
+  labTechnicianId String? // Lab staff who claimed/processed the test
+  claimedAt       DateTime? // When test was claimed
+  startedAt       DateTime? // When test processing started
+  completedAt     DateTime? // When test was completed
+  order           LabOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service         Service       @relation(fields: [serviceId], references: [id])
+  labTechnician   StaffMember?  @relation(fields: [labTechnicianId], references: [id])
 
   @@map("lab_tests")
 }
@@ -1113,16 +1128,27 @@ model LabRequest {
   requestedAt          DateTime         @default(now())
   scheduledAt          DateTime?
   completedAt          DateTime?
+  claimedAt            DateTime? // When lab staff claimed the request
+  startedAt            DateTime? // When processing started
 
   // Lab Details
   labProviderId          String? // Lab technician/provider
   specimenType           String?
   collectionInstructions String?
 
+  // Payment & Billing
+  serviceId      String? // Link to service for billing
+  isPaid         Boolean @default(false)
+  totalPrice     Decimal @default(0) @db.Decimal(10, 2)
+  requirePayment Boolean @default(true) // Whether payment is required before processing
+  invoiceId      String? @unique // Link to invoice
+
   // Relations
   treatment          Treatment    @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
   requestingProvider StaffMember  @relation("LabRequestProvider", fields: [requestingProviderId], references: [id])
   labProvider        StaffMember? @relation("LabProvider", fields: [labProviderId], references: [id])
+  service            Service?     @relation(fields: [serviceId], references: [id])
+  invoice            Invoice?     @relation(fields: [invoiceId], references: [id])
   results            LabResult[]
 
   @@map("lab_requests")
@@ -1332,6 +1358,7 @@ enum DiagnosisStatus {
 
 enum LabRequestStatus {
   REQUESTED
+  CLAIMED
   SCHEDULED
   IN_PROGRESS
   COMPLETED
@@ -1585,6 +1612,7 @@ enum LabOrderStatus {
 
 enum LabTestStatus {
   PENDING
+  CLAIMED
   IN_PROGRESS
   COMPLETED
   CANCELLED
